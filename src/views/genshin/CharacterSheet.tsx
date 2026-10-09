@@ -2,7 +2,9 @@ import { Heart, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { Sheet } from '../../components/Sheet';
 import { toast } from '../../components/toast';
 import { Button, Field, IconButton, Rarity, Segmented, Stepper, TextInput } from '../../components/ui';
-import { CharacterCrest, ElementIcon } from '../../components/visuals';
+import { CharacterIcon, ElementIcon, ItemIcon } from '../../components/visuals';
+import { findArtifactSet, findCharacter, findWeapon } from '../../data/characters';
+import { critValue, fromGoodKey, STAT_LABEL } from '../../core/good';
 import { useT } from '../../i18n';
 import { patchCharacter, restore, setOwned, snapshot } from '../../lib/actions';
 import { update, useStore } from '../../lib/store';
@@ -16,7 +18,7 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
 
   const hero = (
     <div className={`sheet-hero char-hero el-${c.element}`}>
-      <CharacterCrest c={c} size={88} dim={!o} />
+      <CharacterIcon c={c} size={88} dim={!o} />
       <div>
         <div className="char-hero-meta">
           <ElementIcon element={c.element} size={14} />
@@ -191,6 +193,8 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
             </Field>
           </div>
 
+          <Equipment c={c} />
+
           <Field label={t('common.notes')} htmlFor="ch-notes">
             <textarea
               id="ch-notes"
@@ -204,5 +208,55 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
         </div>
       )}
     </Sheet>
+  );
+}
+
+const SLOT_ORDER = ['flower', 'plume', 'sands', 'goblet', 'circlet'];
+const PIECE: Record<string, number> = { flower: 4, plume: 2, sands: 5, goblet: 1, circlet: 3 };
+
+/** Weapon and artifacts equipped on this character, from the last GOOD import. */
+function Equipment({ c }: { c: CharacterDef }) {
+  const t = useT();
+  const inv = useStore((s) => s.inventory);
+  const isMine = (loc: string) => !!loc && (findCharacter(loc) ?? findCharacter(fromGoodKey(loc)))?.id === c.id;
+  const weapon = inv.weapons.find((w) => isMine(w.location));
+  const arts = inv.artifacts.filter((a) => isMine(a.location)).sort((a, b) => SLOT_ORDER.indexOf(a.slotKey) - SLOT_ORDER.indexOf(b.slotKey));
+  if (!weapon && !arts.length) return null;
+  const wDef = weapon ? findWeapon(weapon.key) ?? findWeapon(weapon.name) : undefined;
+  const totalCv = arts.reduce((s, a) => s + critValue(a), 0);
+  return (
+    <Field label={t('chars.equipped')}>
+      <div className="equip">
+        {weapon && (
+          <div className="equip-weapon">
+            <ItemIcon icon={wDef?.icon} name={weapon.name} rarity={wDef?.rarity ?? 3} size={44} />
+            <div>
+              <strong>{wDef?.name ?? weapon.name}</strong>
+              <span className="muted small num">
+                Lv {weapon.level} · R{weapon.refinement}
+              </span>
+            </div>
+          </div>
+        )}
+        {arts.length > 0 && (
+          <>
+            <div className="equip-arts">
+              {arts.map((a) => {
+                const set = findArtifactSet(a.setKey);
+                return (
+                  <div key={a.slotKey} className="equip-art" title={`${set?.name ?? fromGoodKey(a.setKey)} · ${t(`slot.${a.slotKey}`)}`}>
+                    <ItemIcon icon={set?.icon.replace(/_\d$/, `_${PIECE[a.slotKey]}`)} name={a.setKey} rarity={a.rarity} size={40} badge={`+${a.level}`} />
+                    <span className="small">{STAT_LABEL[a.mainStatKey] ?? a.mainStatKey}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <span className="muted small num">
+              {t('inv.cv')} {totalCv.toFixed(1)}
+            </span>
+          </>
+        )}
+      </div>
+    </Field>
   );
 }

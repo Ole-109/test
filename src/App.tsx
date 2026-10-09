@@ -14,6 +14,9 @@ import {
   Sun,
   Tv,
   Users,
+  Package,
+  Calculator,
+  Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CommandPalette } from './components/CommandPalette';
@@ -38,6 +41,9 @@ import { CharacterSheet } from './views/genshin/CharacterSheet';
 import { Characters } from './views/genshin/Characters';
 import { Today } from './views/genshin/Today';
 import { Wishes } from './views/genshin/Wishes';
+import { PlannerPage } from './views/genshin/Planner';
+import { Import } from './views/genshin/Import';
+import { Inventory } from './views/genshin/Inventory';
 import { Home } from './views/Home';
 import { Settings } from './views/Settings';
 
@@ -46,6 +52,9 @@ const VIEWS: Record<Route, () => ReactNode> = {
   '/teyvat': () => <Today />,
   '/teyvat/characters': () => <Characters />,
   '/teyvat/wishes': () => <Wishes />,
+  '/teyvat/planner': () => <PlannerPage />,
+  '/teyvat/import': () => <Import />,
+  '/teyvat/inventory': () => <Inventory />,
   '/anime': () => <LibraryView />,
   '/anime/schedule': () => <Schedule />,
   '/anime/stats': () => <Stats />,
@@ -58,6 +67,8 @@ const GO_KEYS: Record<string, Route> = {
   t: '/teyvat',
   c: '/teyvat/characters',
   w: '/teyvat/wishes',
+  i: '/teyvat/inventory',
+  p: '/teyvat/planner',
   a: '/anime',
   s: '/anime/schedule',
   d: '/discover',
@@ -202,11 +213,14 @@ export function App() {
         </button>
 
         <nav className="nav">
-          <NavLink to="/" icon={<House size={18} />} label={t('nav.home')} />
+          <NavLink to="/" icon={<House size={18} />} label={t('nav.overview')} />
           <div className="nav-group">{t('nav.teyvat')}</div>
           <NavLink to="/teyvat" icon={<ListChecks size={18} />} label={t('nav.today')} />
           <NavLink to="/teyvat/characters" icon={<Users size={18} />} label={t('nav.characters')} />
+          <NavLink to="/teyvat/inventory" icon={<Package size={18} />} label={t('nav.inventory')} />
           <NavLink to="/teyvat/wishes" icon={<Sparkles size={18} />} label={t('nav.wishes')} />
+          <NavLink to="/teyvat/planner" icon={<Calculator size={18} />} label={t('nav.planner')} />
+          <NavLink to="/teyvat/import" icon={<Upload size={18} />} label={t('nav.import')} />
           <div className="nav-group">{t('nav.anime')}</div>
           <NavLink to="/anime" icon={<Library size={18} />} label={t('nav.library')} />
           <NavLink to="/anime/schedule" icon={<CalendarDays size={18} />} label={t('nav.schedule')} />

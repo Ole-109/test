@@ -59,7 +59,7 @@ export function Schedule() {
     <div className="page">
       <AnimeTabs />
       <PageHeader
-        eyebrow={t('nav.anime')}
+       
         title={t('schedule.title')}
         subtitle={t('schedule.subtitle')}
         actions={

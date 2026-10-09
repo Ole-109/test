@@ -1,408 +1,369 @@
-import { Sparkles, Star, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { ProbabilityCurve } from '../../components/charts';
-import { Sheet } from '../../components/Sheet';
-import { toast } from '../../components/toast';
-import { Button, Empty, Field, IconButton, PageHeader, Segmented, Stepper, Switch, TextInput } from '../../components/ui';
-import { useT } from '../../i18n';
-import { addPulls, logFive, logFour, patchBanner, removeFive, restore, snapshot } from '../../lib/actions';
-import {
-  expectedPulls,
-  featuredCurve,
-  fiveStarRate,
-  PRIMOS_PER_PULL,
-  RULES,
-  totalPulls,
-  worstCase,
-} from '../../lib/gacha';
-import { update, useStore } from '../../lib/store';
-import type { BannerKey, FiveStarRecord } from '../../lib/types';
-import { useAllCharacters } from './Characters';
+import { Button, Empty, IconButton, PageHeader } from '../../components/ui';
+import { ItemIcon } from '../../components/visuals';
+import { findCharacter, findWeapon, localName } from '../../data/characters';
+import { useT, type T } from '../../i18n';
+import { analyzePool, POOL_OF, sortRecords, type PoolStats, type PulledItem } from '../../core/wishStats';
+import { RULES } from '../../lib/gacha';
+import { setWishOverride } from '../../lib/importActions';
+import { href, navigate } from '../../lib/router';
+import { useStore } from '../../lib/store';
+import type { BannerKey, WishRecord } from '../../lib/types';
+import { PityCard } from './ManualPity';
+import { pct } from './Planner';
 import { TeyvatTabs } from './TeyvatTabs';
 
 const BANNERS: BannerKey[] = ['character', 'weapon', 'standard', 'chronicled'];
+const PAGE = 30;
 
-const pct = (p: number, lang: string) =>
-  new Intl.NumberFormat(lang === 'de' ? 'de-DE' : 'en-US', {
-    style: 'percent',
-    maximumFractionDigits: p > 0 && p < 0.1 ? 1 : 0,
-  }).format(p);
+export function itemVisual(r: Pick<WishRecord, 'name' | 'itemType' | 'rank'>) {
+  if (r.itemType === 'character') {
+    const c = findCharacter(r.name);
+    return { icon: c?.icon, rarity: c?.rarity ?? r.rank };
+  }
+  const w = findWeapon(r.name);
+  return { icon: w?.icon, rarity: w?.rarity ?? r.rank };
+}
 
-export function Wishes() {
+function shortDate(t: T, time: string) {
+  const d = new Date(time.replace(' ', 'T'));
+  return new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+}
+
+function BannerSummary({ pool, stats, active, onSelect }: { pool: BannerKey; stats: PoolStats; active: boolean; onSelect: () => void }) {
   const t = useT();
-  const [banner, setBanner] = useState<BannerKey>('character');
+  const manual = useStore((s) => s.banners[pool]);
+  const rules = RULES[pool];
+  const pity5 = stats.total ? stats.pity5 : manual.pity5;
+  const pity4 = stats.total ? stats.pity4 : manual.pity4;
+  const total = stats.total || manual.total;
+  const soft = pity5 + 1 >= rules.softStart;
   return (
-    <div className="page">
-      <TeyvatTabs />
-      <PageHeader eyebrow={t('nav.teyvat')} title={t('wish.title')} subtitle={t('wish.subtitle')} />
-      <Segmented
-        label={t('wish.title')}
-        value={banner}
-        onChange={setBanner}
-        className="banner-tabs"
-        options={BANNERS.map((b) => ({ value: b, label: t(`wish.banner.${b}`) }))}
-      />
-      <div className="grid-wishes">
-        <PityCard banner={banner} />
-        <HistoryCard banner={banner} />
-        <Planner />
+    <button type="button" className={`banner-sum ${active ? 'is-active' : ''}`} onClick={onSelect} aria-pressed={active}>
+      <div className="banner-sum-head">
+        <span>{t(`wish.banner.${pool}`)}</span>
+        <span className="muted small num">{t.num(total)}</span>
       </div>
+      <div className="banner-sum-pity">
+        <strong className={`num ${soft ? 'text-r5' : ''}`}>{pity5}</strong>
+        <span className="muted">/{rules.hard}</span>
+        <span className="banner-sum-four num">
+          <span className="text-r4">4★</span> {pity4}/10
+        </span>
+      </div>
+      <div className="meter">
+        <span style={{ width: `${(pity5 / rules.hard) * 100}%` }} className={soft ? 'soft' : ''} />
+        <i style={{ left: `${((rules.softStart - 1) / rules.hard) * 100}%` }} />
+      </div>
+      <span className="muted small">
+        {pool === 'character' || pool === 'chronicled'
+          ? (stats.total ? stats.guaranteed : manual.guaranteed)
+            ? t('wish.guaranteed')
+            : t('wish.fiftyFifty')
+          : pool === 'weapon'
+            ? `${t('wish.fatePoint')} ${manual.fatePoints}/1`
+            : ' '}
+      </span>
+    </button>
+  );
+}
+
+function FiveList({ stats, pool }: { stats: PoolStats; pool: BannerKey }) {
+  const t = useT();
+  const hard = RULES[pool].hard;
+  const soft = RULES[pool].softStart;
+  if (!stats.five.length) return <p className="muted pad">{t('wish.noFive')}</p>;
+  return (
+    <ul className="five-list">
+      <li className="five-row is-current">
+        <span className="five-current muted small">{t('wish.sinceLast', { n: stats.pity5 })}</span>
+        <div className="pitybar">
+          <span style={{ width: `${(stats.pity5 / hard) * 100}%` }} />
+        </div>
+        <span className="num">{stats.pity5}</span>
+      </li>
+      {stats.fiveNewestFirst.map((f: PulledItem) => {
+        const v = itemVisual(f.record);
+        const cycle = () => setWishOverride(f.record.id, f.outcome === 'won' ? 'lost' : 'won');
+        return (
+          <li key={f.record.id} className="five-row">
+            <ItemIcon icon={v.icon} name={f.record.name} rarity={5} size={40} />
+            <div className="five-name">
+              <strong>{localName(f.record.name, t.lang)}</strong>
+              <span className="muted small">
+                {shortDate(t, f.record.time)}
+                {f.record.gachaType === '400' && ` · ${t('wish.second')}`}
+              </span>
+            </div>
+            {f.outcome === 'won' || f.outcome === 'lost' ? (
+              <button type="button" className={`outcome outcome-${f.outcome}`} onClick={cycle} title={t('wish.overrideHint')}>
+                {t(`wish.outcome.${f.outcome}`)}
+              </button>
+            ) : f.outcome === 'guaranteed' ? (
+              <span className="outcome outcome-guaranteed">{t('wish.outcome.guaranteed')}</span>
+            ) : (
+              <span />
+            )}
+            <div className="pitybar">
+              <span style={{ width: `${(f.pity / hard) * 100}%` }} className={f.pity >= soft ? 'soft' : ''} />
+            </div>
+            <span className={`num pity-num ${f.pity >= soft ? 'text-r5' : ''}`}>{f.pity}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function StatsTable({ stats }: { stats: PoolStats }) {
+  const t = useT();
+  const total = stats.total || 1;
+  const rows: [string, string, string?][] = [
+    [t('wish.lifetime'), t.num(stats.total), t('wish.primosSpent', { n: t.num(stats.total * 160) })],
+    [`${t('wish.fiveStars')}`, t.num(stats.five.length), pct(stats.five.length / total, t.lang)],
+    [`${t('wish.fourStars')}`, t.num(stats.four.length), pct(stats.four.length / total, t.lang)],
+    [`${t('wish.threeStars')}`, t.num(stats.threeCount), pct(stats.threeCount / total, t.lang)],
+    [t('wish.avgPity') + ' 5★', stats.five.length ? t.num(Math.round(stats.avgPity5 * 10) / 10) : '—'],
+    [t('wish.avgPity') + ' 4★', stats.four.length ? t.num(Math.round(stats.avgPity4 * 10) / 10) : '—'],
+  ];
+  if (stats.pool === 'character') rows.push([t('wish.winRate'), `${stats.fiftyWon} / ${stats.fiftyWon + stats.fiftyLost}`, stats.fiftyWon + stats.fiftyLost ? pct(stats.fiftyWon / (stats.fiftyWon + stats.fiftyLost), t.lang) : undefined]);
+  return (
+    <table className="kv">
+      <tbody>
+        {rows.map(([k, v, extra]) => (
+          <tr key={k}>
+            <th>{k}</th>
+            <td className="num">{v}</td>
+            <td className="num muted">{extra ?? ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function FourSummary({ stats }: { stats: PoolStats }) {
+  const counts = useMemo(() => {
+    const m = new Map<string, { r: WishRecord; n: number }>();
+    for (const f of stats.four) {
+      const e = m.get(f.record.name);
+      if (e) e.n++;
+      else m.set(f.record.name, { r: f.record, n: 1 });
+    }
+    return [...m.values()].sort((a, b) => b.n - a.n || a.r.name.localeCompare(b.r.name));
+  }, [stats]);
+  if (!counts.length) return null;
+  return (
+    <div className="four-grid">
+      {counts.map(({ r, n }) => {
+        const v = itemVisual(r);
+        return (
+          <div key={r.name} className="four-item" title={r.name}>
+            <ItemIcon icon={v.icon} name={r.name} rarity={4} size={44} badge={`×${n}`} />
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function PityCard({ banner }: { banner: BannerKey }) {
+function PullLog({ records, pool }: { records: WishRecord[]; pool: BannerKey }) {
   const t = useT();
-  const b = useStore((s) => s.banners[banner]);
-  const rules = RULES[banner];
-  const [logging, setLogging] = useState(false);
-  const next = fiveStarRate(rules, b.pity5 + 1);
-  const inSoft = b.pity5 + 1 >= rules.softStart;
-  const softPct = ((rules.softStart - 1) / rules.hard) * 100;
+  const [q, setQ] = useState('');
+  const [ranks, setRanks] = useState<Set<number>>(new Set([3, 4, 5]));
+  const [page, setPage] = useState(0);
+
+  // Pity at each pull (pulls since the previous item of the same or higher rarity).
+  const rows = useMemo(() => {
+    const asc = sortRecords(records.filter((r) => POOL_OF[r.gachaType] === pool));
+    let s5 = 0;
+    let s4 = 0;
+    const out = asc.map((r) => {
+      s5++;
+      s4++;
+      const pity = r.rank === 5 ? s5 : r.rank === 4 ? s4 : s5;
+      if (r.rank === 5) s5 = s4 = 0;
+      else if (r.rank === 4) s4 = 0;
+      return { r, pity };
+    });
+    return out.reverse();
+  }, [records, pool]);
+
+  const needle = q.trim().toLowerCase();
+  const filtered = rows.filter(
+    ({ r }) => ranks.has(r.rank) && (!needle || r.name.toLowerCase().includes(needle) || localName(r.name, t.lang).toLowerCase().includes(needle)),
+  );
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const cur = Math.min(page, pages - 1);
+  const slice = filtered.slice(cur * PAGE, cur * PAGE + PAGE);
 
   return (
-    <section className={`card pity-card banner-${banner}`} aria-labelledby="pity-h">
+    <section className="card" aria-labelledby="log-h">
       <div className="card-head">
-        <h2 id="pity-h" className="card-title">
-          {t(`wish.banner.${banner}`)}
+        <h2 id="log-h" className="card-title">
+          {t('wish.log')}
         </h2>
-        <span className="muted small">{t('wish.total', { n: t.num(b.total) })}</span>
-      </div>
-
-      <div className="pity-hero">
-        <div className="pity-number">
-          <span className="eyebrow">{t('wish.pity5')}</span>
-          <strong className="num">{b.pity5}</strong>
-          <span className="muted">/ {rules.hard}</span>
-        </div>
-        <div className="pity-side">
-          <p className={inSoft ? 'pity-soft' : ''}>
-            {inSoft && <Sparkles size={14} aria-hidden />} {t('wish.nextChance', { p: pct(next, t.lang) })}
-          </p>
-          <p className="muted small">{t('wish.hardPity', { n: Math.max(0, rules.hard - b.pity5) })}</p>
-        </div>
-      </div>
-
-      <div className="pity-track" role="meter" aria-valuemin={0} aria-valuemax={rules.hard} aria-valuenow={b.pity5} aria-label={t('wish.pity5')}>
-        <div className="pity-soft-zone" style={{ left: `${softPct}%` }}>
-          <span>{t('wish.softPity')}</span>
-        </div>
-        <div className="pity-fill" style={{ width: `${(b.pity5 / rules.hard) * 100}%` }} />
-      </div>
-
-      <div className="pity4">
-        <span className="muted small">{t('wish.pity4')}</span>
-        <div className="pips" aria-label={`${t('wish.pity4')} ${b.pity4}/10`}>
-          {Array.from({ length: 10 }, (_, i) => (
-            <span key={i} className={i < b.pity4 ? 'on' : ''} />
+        <div className="row gap-sm wrap">
+          {[5, 4, 3].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`chip-toggle text-r${n} ${ranks.has(n) ? 'is-on' : ''}`}
+              aria-pressed={ranks.has(n)}
+              onClick={() => {
+                const next = new Set(ranks);
+                if (next.has(n)) next.delete(n);
+                else next.add(n);
+                setRanks(next);
+                setPage(0);
+              }}
+            >
+              {n}★
+            </button>
           ))}
+          <label className="search search-sm">
+            <Search size={14} aria-hidden />
+            <input
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setPage(0);
+              }}
+              placeholder={t('wish.logSearch')}
+              aria-label={t('wish.logSearch')}
+            />
+          </label>
         </div>
-        <span className="num small">{b.pity4}/10</span>
       </div>
-
-      {banner === 'character' || banner === 'chronicled' ? (
-        <Switch
-          checked={b.guaranteed}
-          onChange={(guaranteed) => patchBanner(banner, { guaranteed })}
-          label={t('wish.guaranteed')}
-          description={b.guaranteed ? undefined : t('wish.fiftyFifty')}
-        />
-      ) : banner === 'weapon' ? (
-        <Switch
-          checked={b.fatePoints > 0}
-          onChange={(on) => patchBanner(banner, { fatePoints: on ? 1 : 0, guaranteed: on })}
-          label={`${t('wish.fatePoint')} ${b.fatePoints}/1`}
-        />
-      ) : null}
-
-      <div className="pity-actions">
-        <Button onClick={() => addPulls(banner, 1)}>{t('wish.add1')}</Button>
-        <Button onClick={() => addPulls(banner, 10)}>{t('wish.add10')}</Button>
-        <Button onClick={() => logFour(banner)} icon={<Star size={14} />}>
-          {t('wish.got4')}
-        </Button>
-        <Button variant="primary" onClick={() => setLogging(true)} icon={<Sparkles size={14} />}>
-          {t('wish.got5')}
-        </Button>
+      <div className="table-wrap">
+        <table className="log-table">
+          <thead>
+            <tr>
+              <th>{t('wish.colItem')}</th>
+              <th>{t('wish.colType')}</th>
+              <th className="num">{t('wish.colPity')}</th>
+              <th>{t('wish.colTime')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map(({ r, pity }) => {
+              const v = itemVisual(r);
+              return (
+                <tr key={r.id} className={`rank-${r.rank}`}>
+                  <td>
+                    <span className="log-item">
+                      <ItemIcon icon={v.icon} name={r.name} rarity={r.rank} size={26} />
+                      <span className={r.rank > 3 ? `text-r${r.rank}` : ''}>{localName(r.name, t.lang)}</span>
+                    </span>
+                  </td>
+                  <td className="muted">{r.itemType === 'character' ? t('wish.character') : t('wish.weapon')}</td>
+                  <td className="num">{r.rank > 3 ? pity : ''}</td>
+                  <td className="muted num nowrap">{r.time}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-
-      <div className="pity-set">
-        <span className="muted small">{t('wish.setPity')}</span>
-        <Stepper size="sm" label={t('wish.setPity')} value={b.pity5} min={0} max={rules.hard - 1} onChange={(pity5) => patchBanner(banner, { pity5 })} />
+      <div className="pager">
+        <span className="muted small">
+          {t('wish.showing', { from: filtered.length ? cur * PAGE + 1 : 0, to: cur * PAGE + slice.length, total: t.num(filtered.length) })}
+        </span>
+        <div className="row gap-xs">
+          <IconButton label={t('wish.prev')} disabled={cur === 0} onClick={() => setPage(cur - 1)}>
+            <ChevronLeft size={16} />
+          </IconButton>
+          <span className="num small">
+            {cur + 1}/{pages}
+          </span>
+          <IconButton label={t('wish.next')} disabled={cur >= pages - 1} onClick={() => setPage(cur + 1)}>
+            <ChevronRight size={16} />
+          </IconButton>
+        </div>
       </div>
-
-      {logging && <LogFiveSheet banner={banner} onClose={() => setLogging(false)} />}
     </section>
   );
 }
 
-function LogFiveSheet({ banner, onClose }: { banner: BannerKey; onClose: () => void }) {
+export function Wishes() {
   const t = useT();
-  const b = useStore((s) => s.banners[banner]);
-  const chars = useAllCharacters();
-  const [name, setName] = useState('');
-  const [pity, setPity] = useState(Math.max(1, b.pity5 + 1));
-  const defaultOutcome: FiveStarRecord['outcome'] = banner === 'standard' ? 'na' : b.guaranteed ? 'guaranteed' : 'won';
-  const [outcome, setOutcome] = useState<FiveStarRecord['outcome']>(defaultOutcome);
-  const hard = RULES[banner].hard;
-
-  const submit = () => {
-    if (!name.trim()) return;
-    logFive(banner, { name: name.trim(), pity, outcome });
-    toast({ message: t('wish.logged', { name: name.trim(), n: pity }), tone: 'success' });
-    onClose();
-  };
-
-  const outcomes: FiveStarRecord['outcome'][] =
-    banner === 'standard' ? ['na'] : b.guaranteed ? ['guaranteed'] : ['won', 'lost'];
+  const wishes = useStore((s) => s.wishes);
+  const overrides = useStore((s) => s.wishMeta.overrides);
+  const [pool, setPool] = useState<BannerKey>('character');
+  const stats = useMemo(
+    () => Object.fromEntries(BANNERS.map((b) => [b, analyzePool(b, wishes, overrides)])) as Record<BannerKey, PoolStats>,
+    [wishes, overrides],
+  );
+  const st = stats[pool];
 
   return (
-    <Sheet
-      open
-      onClose={onClose}
-      title={t('wish.logTitle')}
-      closeLabel={t('common.close')}
-      footer={
+    <div className="page">
+      <TeyvatTabs />
+      <PageHeader
+        title={t('wish.title')}
+        subtitle={t('wish.subtitle')}
+        actions={
+          <Button icon={<Upload size={16} />} variant={wishes.length ? 'secondary' : 'primary'} onClick={() => navigate('/teyvat/import')}>
+            {t('wish.importCta')}
+          </Button>
+        }
+      />
+
+      <div className="banner-sums">
+        {BANNERS.map((b) => (
+          <BannerSummary key={b} pool={b} stats={stats[b]} active={pool === b} onSelect={() => setPool(b)} />
+        ))}
+      </div>
+
+      {st.total === 0 ? (
         <>
-          <Button variant="ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button variant="primary" onClick={submit} disabled={!name.trim()}>
-            {t('common.save')}
-          </Button>
+          {wishes.length === 0 && (
+            <Empty
+              icon={<Upload size={26} />}
+              title={t('wish.emptyTitle')}
+              body={t('wish.emptyBody')}
+              action={
+                <a className="btn btn-primary btn-md" href={href('/teyvat/import')}>
+                  <Upload size={16} />
+                  <span>{t('wish.importCta')}</span>
+                </a>
+              }
+            />
+          )}
+          <PityCard banner={pool} />
         </>
-      }
-    >
-      <form
-        className="form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <Field label={t('wish.itemName')} htmlFor="five-name">
-          <TextInput id="five-name" data-autofocus list="five-names" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
-          <datalist id="five-names">
-            {chars
-              .filter((c) => c.rarity === 5)
-              .map((c) => (
-                <option key={c.id} value={c.name} />
-              ))}
-          </datalist>
-        </Field>
-        <Field label={t('wish.atPity')}>
-          <Stepper label={t('wish.atPity')} value={pity} min={1} max={hard} onChange={setPity} />
-        </Field>
-        {banner !== 'standard' && (
-          <Field label={t('wish.outcome')}>
-            <Segmented
-              label={t('wish.outcome')}
-              value={outcome}
-              onChange={setOutcome}
-              options={outcomes.map((o) => ({ value: o, label: t(`wish.outcome.${o}`) }))}
-            />
-          </Field>
-        )}
-      </form>
-    </Sheet>
-  );
-}
-
-function HistoryCard({ banner }: { banner: BannerKey }) {
-  const t = useT();
-  const b = useStore((s) => s.banners[banner]);
-  const h = b.history;
-  const avg = h.length ? h.reduce((s, x) => s + x.pity, 0) / h.length : 0;
-  const fifty = h.filter((x) => x.outcome === 'won' || x.outcome === 'lost');
-  const won = fifty.filter((x) => x.outcome === 'won').length;
-  const hard = RULES[banner].hard;
-  const df = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-
-  return (
-    <section className="card history-card" aria-labelledby="hist-h">
-      <div className="card-head">
-        <h2 id="hist-h" className="card-title">
-          {t('wish.history')}
-        </h2>
-      </div>
-      {h.length > 0 && (
-        <div className="mini-stats">
-          <div>
-            <span className="muted small">{t('wish.avgPity')}</span>
-            <strong className="num">{t.num(Math.round(avg * 10) / 10)}</strong>
-          </div>
-          {fifty.length > 0 && (
-            <div>
-              <span className="muted small">{t('wish.winRate')}</span>
-              <strong className="num">
-                {won}/{fifty.length}
-              </strong>
-            </div>
-          )}
-        </div>
-      )}
-      {h.length === 0 ? (
-        <Empty icon={<Star size={24} />} title={t('wish.historyEmpty')} />
       ) : (
-        <ul className="history">
-          {h.map((x) => (
-            <li key={x.id}>
-              <div className="history-main">
-                <strong>{x.name}</strong>
-                <span className="muted small">{df.format(x.at)}</span>
-              </div>
-              {x.outcome !== 'na' && <span className={`outcome outcome-${x.outcome}`}>{t(`wish.outcome.${x.outcome}`)}</span>}
-              <div className="history-pity" title={`${x.pity}/${hard}`}>
-                <div className="bar">
-                  <div
-                    className={`bar-fill ${x.pity >= RULES[banner].softStart ? 'soft' : ''}`}
-                    style={{ width: `${(x.pity / hard) * 100}%` }}
-                  />
-                </div>
-                <span className="num">{x.pity}</span>
-              </div>
-              <IconButton
-                label={t('common.delete')}
-                onClick={() => {
-                  const snap = snapshot();
-                  removeFive(banner, x.id);
-                  toast({ message: t('common.deleted', { name: x.name }), action: { label: t('common.undo'), run: () => restore(snap) } });
-                }}
-              >
-                <Trash2 size={15} />
-              </IconButton>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="wish-grid">
+            <section className="card" aria-labelledby="five-h">
+              <h2 id="five-h" className="card-title">
+                {t('wish.history')} · {t(`wish.banner.${pool}`)}
+              </h2>
+              <FiveList stats={st} pool={pool} />
+            </section>
+            <div className="stack">
+              <section className="card" aria-label={t('wish.title')}>
+                <StatsTable stats={st} />
+              </section>
+              {st.four.length > 0 && (
+                <section className="card" aria-labelledby="four-h">
+                  <h2 id="four-h" className="card-title">
+                    {t('wish.fourList')}
+                  </h2>
+                  <FourSummary stats={st} />
+                </section>
+              )}
+            </div>
+          </div>
+          <PullLog records={wishes} pool={pool} />
+          <details className="card manual-details">
+            <summary className="card-title">{t('wish.manual')}</summary>
+            <p className="muted small">{t('wish.manualHint')}</p>
+            <PityCard banner={pool} />
+          </details>
+        </>
       )}
-    </section>
-  );
-}
-
-function Planner() {
-  const t = useT();
-  const plan = useStore((s) => s.plan);
-  const banners = useStore((s) => s.banners);
-  const setPlan = (patch: Partial<typeof plan>) => update('plan', (p) => ({ ...p, ...patch }));
-  const pulls = totalPulls(plan.primogems, plan.fates, plan.starglitter);
-  const b = banners[plan.banner];
-  const rules = RULES[plan.banner];
-  const guaranteed = plan.banner === 'weapon' ? b.fatePoints > 0 : b.guaranteed;
-  const worst = worstCase(plan.banner, b.pity5, guaranteed, plan.copies);
-
-  const curve = useMemo(
-    () =>
-      featuredCurve(rules, {
-        pity: b.pity5,
-        guaranteed,
-        copies: plan.copies,
-        maxPulls: worst,
-        featured: plan.banner === 'character' ? plan.rate : undefined,
-      }),
-    [rules, b.pity5, guaranteed, plan.copies, worst, plan.banner, plan.rate],
-  );
-  const chance = curve[Math.min(pulls, curve.length - 1)];
-  const expected = expectedPulls(curve);
-  const shortPrimos = Math.max(0, (worst - pulls) * PRIMOS_PER_PULL);
-  const maxCopies = plan.banner === 'character' ? 7 : 5;
-
-  return (
-    <section className="card planner-card" aria-labelledby="plan-h">
-      <div className="card-head">
-        <div>
-          <h2 id="plan-h" className="card-title">
-            {t('wish.planner')}
-          </h2>
-          <p className="muted small">{t('wish.plannerHint')}</p>
-        </div>
-      </div>
-
-      <div className="planner-grid">
-        <div className="planner-inputs">
-          <Field label={t('wish.primogems')}>
-            <Stepper label={t('wish.primogems')} value={plan.primogems} step={160} max={999_999} onChange={(primogems) => setPlan({ primogems })} format={(v) => t.num(v)} />
-          </Field>
-          <Field label={t('wish.fates')}>
-            <Stepper label={t('wish.fates')} value={plan.fates} max={9999} onChange={(fates) => setPlan({ fates })} />
-          </Field>
-          <Field label={t('wish.starglitter')}>
-            <Stepper label={t('wish.starglitter')} value={plan.starglitter} step={5} max={99_999} onChange={(starglitter) => setPlan({ starglitter })} />
-          </Field>
-          <div className="you-have">
-            <span className="muted small">{t('wish.youHave')}</span>
-            <strong>{t.n('wish.pulls', pulls)}</strong>
-          </div>
-
-          <Field label={t('wish.target')}>
-            <Segmented
-              label={t('wish.target')}
-              value={plan.banner}
-              onChange={(banner) => setPlan({ banner, copies: Math.min(plan.copies, banner === 'character' ? 7 : 5) })}
-              options={[
-                { value: 'character', label: t('wish.banner.character') },
-                { value: 'weapon', label: t('wish.banner.weapon') },
-              ]}
-            />
-          </Field>
-          <Field label={t('wish.copies')}>
-            <Segmented
-              size="sm"
-              label={t('wish.copies')}
-              value={plan.copies}
-              onChange={(copies) => setPlan({ copies })}
-              className="seg-fill"
-              options={Array.from({ length: maxCopies }, (_, i) => ({
-                value: i + 1,
-                label: t(plan.banner === 'character' ? 'wish.copiesHint.character' : 'wish.copiesHint.weapon', {
-                  c: plan.banner === 'character' ? i : i + 1,
-                }),
-              }))}
-            />
-          </Field>
-          {plan.banner === 'character' && (
-            <Field label={t('wish.rate')}>
-              <Segmented
-                size="sm"
-                label={t('wish.rate')}
-                value={plan.rate}
-                onChange={(rate) => setPlan({ rate })}
-                options={[
-                  { value: 0.5, label: t('wish.rate.classic') },
-                  { value: 0.55, label: t('wish.rate.radiance') },
-                ]}
-              />
-            </Field>
-          )}
-          <p className="muted small">{t('wish.usesPity', { banner: t(`wish.banner.${plan.banner}`) })}</p>
-        </div>
-
-        <div className="planner-result">
-          <div className="chance">
-            <span className="eyebrow">{t('wish.chance')}</span>
-            <strong className={`chance-value ${chance >= 0.75 ? 'good' : chance >= 0.4 ? 'mid' : 'low'}`}>{pct(chance, t.lang)}</strong>
-          </div>
-          <div className="mini-stats">
-            <div>
-              <span className="muted small">{t('wish.expected')}</span>
-              <strong className="num">{t.num(Math.round(expected))}</strong>
-            </div>
-            <div>
-              <span className="muted small">{t('wish.worst')}</span>
-              <strong className="num">{t.n('wish.pulls', worst)}</strong>
-            </div>
-            <div>
-              <span className="muted small">{t('wish.short')}</span>
-              <strong className="num">{t.num(shortPrimos)}</strong>
-            </div>
-          </div>
-          <ProbabilityCurve
-            curve={curve}
-            marker={pulls}
-            label={t('wish.curveLabel')}
-            tip={(n, p) => t('wish.curveTip', { p: pct(p, t.lang), n })}
-          />
-        </div>
-      </div>
-    </section>
+    </div>
   );
 }

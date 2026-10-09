@@ -2,8 +2,8 @@ import { Heart, Plus, Search, UserPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Sheet } from '../../components/Sheet';
 import { toast } from '../../components/toast';
-import { Button, Empty, Field, PageHeader, Rarity, Segmented, TextInput } from '../../components/ui';
-import { CharacterCrest, ElementIcon } from '../../components/visuals';
+import { Button, Empty, Field, PageHeader, Segmented, TextInput } from '../../components/ui';
+import { CharacterIcon, ElementIcon } from '../../components/visuals';
 import { BASE_CHARACTERS, ELEMENTS, REGIONS, slug, WEAPONS } from '../../data/characters';
 import { useT } from '../../i18n';
 import { setOwned } from '../../lib/actions';
@@ -64,7 +64,7 @@ export function Characters() {
     <div className="page">
       <TeyvatTabs />
       <PageHeader
-        eyebrow={t('nav.teyvat')}
+       
         title={t('chars.title')}
         subtitle={t('chars.subtitle', { owned: ownedCount, total: all.length, built: builtCount })}
         actions={
@@ -146,45 +146,41 @@ export function Characters() {
             const o = owned[c.id];
             return (
               <li key={c.id}>
-                <div className={`char-card el-${c.element} ${o ? 'is-owned' : ''}`}>
-                  <button type="button" className="char-open" onClick={() => setOpen(c.id)} aria-label={c.name}>
-                    <CharacterCrest c={c} size={64} dim={!o} />
-                    <div className="char-body">
-                      <div className="char-name">
-                        {o?.favorite && <Heart size={12} fill="currentColor" className="fav" aria-hidden />}
-                        <span>{c.name}</span>
-                      </div>
-                      <div className="char-meta">
-                        <ElementIcon element={c.element} size={12} title={t(`el.${c.element}`)} />
-                        <Rarity n={c.rarity} size={10} />
-                      </div>
-                      {o ? (
-                        <div className="char-stats">
-                          <span className="num">Lv {o.level}</span>
-                          <span className="num">C{o.constellation}</span>
-                          <span className="num muted">{o.talents.join('/')}</span>
-                          <span className={`build-dot build-${o.build}`} title={t(`chars.build.${o.build}`)} />
-                        </div>
-                      ) : (
-                        <div className="char-stats muted">{t(`wp.${c.weapon}`)}</div>
-                      )}
-                    </div>
+                <button type="button" className={`char-tile ${o ? 'is-owned' : ''}`} onClick={() => setOpen(c.id)} aria-label={c.name}>
+                  <div className="char-tile-art">
+                    <CharacterIcon c={c} size={88} dim={!o} />
+                    <span className="char-el">
+                      <ElementIcon element={c.element} size={13} title={t(`el.${c.element}`)} />
+                    </span>
+                    {o && <span className="char-cons">C{o.constellation}</span>}
+                    {o?.favorite && <Heart size={12} fill="currentColor" className="char-fav" aria-hidden />}
+                  </div>
+                  <span className="char-tile-name">{t.lang === 'de' && c.nameDe ? c.nameDe : c.name}</span>
+                  <span className="char-tile-meta num">
+                    {o ? (
+                      <>
+                        Lv {o.level} · {o.talents.join('/')}
+                        <span className={`build-dot build-${o.build}`} title={t(`chars.build.${o.build}`)} />
+                      </>
+                    ) : (
+                      <span className="muted">{t(`wp.${c.weapon}`)}</span>
+                    )}
+                  </span>
+                </button>
+                {!o && (
+                  <button
+                    type="button"
+                    className="char-quick"
+                    aria-label={`${t('chars.markOwned')}: ${c.name}`}
+                    title={t('chars.markOwned')}
+                    onClick={() => {
+                      setOwned(c.id, true);
+                      toast({ message: t('chars.added', { name: c.name }), tone: 'success' });
+                    }}
+                  >
+                    <Plus size={14} />
                   </button>
-                  {!o && (
-                    <button
-                      type="button"
-                      className="char-quick"
-                      aria-label={`${t('chars.markOwned')}: ${c.name}`}
-                      title={t('chars.markOwned')}
-                      onClick={() => {
-                        setOwned(c.id, true);
-                        toast({ message: t('chars.added', { name: c.name }), tone: 'success' });
-                      }}
-                    >
-                      <Plus size={16} />
-                    </button>
-                  )}
-                </div>
+                )}
               </li>
             );
           })}

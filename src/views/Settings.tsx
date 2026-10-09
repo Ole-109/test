@@ -1,7 +1,8 @@
 import { Download, Trash2, Upload } from 'lucide-react';
 import { useRef } from 'react';
 import { toast } from '../components/toast';
-import { Button, Field, Kbd, PageHeader, Segmented, Stepper, Switch } from '../components/ui';
+import { Button, Field, Kbd, PageHeader, Segmented, Stepper, Switch, TextInput } from '../components/ui';
+import { BASE_CHARACTERS, GAME_DATA_UPDATED } from '../data/characters';
 import { useT } from '../i18n';
 import { restore, setSetting, snapshot } from '../lib/actions';
 import { defaultState, hydrate, setState, useStore } from '../lib/store';
@@ -90,6 +91,17 @@ export function Settings() {
           <Stepper label={t('settings.resinCap')} value={settings.resinCap} min={60} max={400} step={20} onChange={(v) => setSetting('resinCap', v)} />
         </Field>
         <Switch checked={settings.resinNotify} onChange={requestNotify} label={t('resin.notify')} description={t('resin.notifyHint')} />
+        <Field label={t('settings.proxy')} hint={t('settings.proxyHint')} htmlFor="proxy-url">
+          <TextInput
+            id="proxy-url"
+            type="url"
+            inputMode="url"
+            placeholder="https://your-worker.workers.dev"
+            value={settings.proxyUrl}
+            onChange={(e) => setSetting('proxyUrl', e.target.value.trim())}
+          />
+        </Field>
+        <p className="muted small">{t('settings.gameData', { date: GAME_DATA_UPDATED, n: BASE_CHARACTERS.length })}</p>
       </section>
 
       <section className="card settings-section" aria-labelledby="set-anime">

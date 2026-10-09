@@ -24,6 +24,85 @@ export interface CharacterDef {
   rarity: 4 | 5;
   region: Region;
   custom?: boolean;
+  nameDe?: string;
+  avatarId?: number;
+  /** Release timestamp (seconds). */
+  release?: number;
+  icon?: string;
+}
+
+export interface WeaponDef {
+  id: number;
+  key: string;
+  name: string;
+  nameDe?: string;
+  rarity: 1 | 2 | 3 | 4 | 5;
+  type: Weapon;
+  icon: string;
+}
+
+/** HoYoverse gacha_type values. 400 is the second character event banner. */
+export type GachaType = '100' | '200' | '301' | '400' | '302' | '500';
+export type WishPool = BannerKey | 'beginner';
+
+/** One pull, as returned by the in-game wish history (UIGF-compatible). */
+export interface WishRecord {
+  /** HoYoverse record id: unique and increasing over time. */
+  id: string;
+  gachaType: GachaType;
+  name: string;
+  itemType: 'character' | 'weapon';
+  rank: 3 | 4 | 5;
+  /** Server-local time "YYYY-MM-DD HH:mm:ss". */
+  time: string;
+  itemId?: string;
+}
+
+export interface WishMeta {
+  uid?: string;
+  importedAt?: number;
+  source?: string;
+  /** Manual corrections of the 50/50 result, keyed by record id. */
+  overrides: Record<string, 'won' | 'lost'>;
+}
+
+export type ArtifactSlot = 'flower' | 'plume' | 'sands' | 'goblet' | 'circlet';
+
+export interface InvWeapon {
+  key: string;
+  name: string;
+  level: number;
+  ascension: number;
+  refinement: number;
+  location: string;
+  lock: boolean;
+}
+
+export interface InvArtifact {
+  setKey: string;
+  slotKey: ArtifactSlot;
+  level: number;
+  rarity: number;
+  mainStatKey: string;
+  location: string;
+  lock: boolean;
+  substats: { key: string; value: number }[];
+}
+
+export interface Inventory {
+  weapons: InvWeapon[];
+  artifacts: InvArtifact[];
+  materials: Record<string, number>;
+  importedAt?: number;
+  source?: string;
+}
+
+export interface Account {
+  uid?: string;
+  nickname?: string;
+  level?: number;
+  worldLevel?: number;
+  server?: string;
 }
 
 export type BuildStatus = 'planned' | 'farming' | 'built';
@@ -36,6 +115,8 @@ export interface OwnedCharacter {
   weapon: string;
   refinement: number;
   artifacts: string;
+  /** Ascension phase 0–6 (from imports). */
+  ascension?: number;
   build: BuildStatus;
   favorite: boolean;
   notes: string;
@@ -132,6 +213,8 @@ export interface Settings {
   resinCap: number;
   resinNotify: boolean;
   sidebarCollapsed: boolean;
+  /** Optional CORS proxy for importing wishes from a URL (see tools/proxy). */
+  proxyUrl: string;
 }
 
 export interface ResinState {
@@ -151,4 +234,8 @@ export interface AppState {
   banners: Record<BannerKey, BannerState>;
   plan: WishPlan;
   anime: AnimeEntry[];
+  wishes: WishRecord[];
+  wishMeta: WishMeta;
+  inventory: Inventory;
+  account: Account;
 }

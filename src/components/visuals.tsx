@@ -1,5 +1,6 @@
 import { Droplet, Flame, Gem, Leaf, Snowflake, Sparkles, Wind, Zap } from 'lucide-react';
-import { useId, useState, type CSSProperties } from 'react';
+import { useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { iconUrl } from '../data/characters';
 import type { CharacterDef, Element } from '../lib/types';
 
 const ELEMENT_ICON: Record<Element, typeof Flame> = {
@@ -31,17 +32,40 @@ const initials = (name: string) =>
     .join('')
     .toUpperCase();
 
-/** Character portrait placeholder: element-tinted crest with initials. */
-export function CharacterCrest({ c, size = 56, dim }: { c: CharacterDef; size?: number; dim?: boolean }) {
+/** Game-style item tile: icon on a rarity background, with graceful fallback to initials. */
+export function ItemIcon({
+  icon,
+  name,
+  rarity,
+  size = 56,
+  dim,
+  badge,
+  className = '',
+}: {
+  icon?: string;
+  name: string;
+  rarity: number;
+  size?: number;
+  dim?: boolean;
+  badge?: ReactNode;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = iconUrl(icon);
   return (
-    <div
-      className={`crest crest-${c.rarity} el-${c.element} ${dim ? 'is-dim' : ''}`}
-      style={{ width: size, height: size, fontSize: size * 0.34 }}
-      aria-hidden
-    >
-      <span>{initials(c.name)}</span>
+    <div className={`item-icon r${Math.min(5, Math.max(1, rarity))} ${dim ? 'is-dim' : ''} ${className}`} style={{ width: size, height: size }} aria-hidden>
+      {src && !failed ? (
+        <img src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+      ) : (
+        <span style={{ fontSize: size * 0.32 }}>{initials(name)}</span>
+      )}
+      {badge != null && <span className="item-badge">{badge}</span>}
     </div>
   );
+}
+
+export function CharacterIcon({ c, size = 56, dim, badge }: { c: CharacterDef; size?: number; dim?: boolean; badge?: ReactNode }) {
+  return <ItemIcon icon={c.icon} name={c.name} rarity={c.rarity} size={size} dim={dim} badge={badge} />;
 }
 
 /** Anime cover with graceful fallback when the image is missing or fails to load. */

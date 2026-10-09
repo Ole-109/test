@@ -25,6 +25,7 @@ export function defaultState(): AppState {
       resinCap: 200,
       resinNotify: false,
       sidebarCollapsed: false,
+      proxyUrl: '',
     },
     resin: { value: 0, at: Date.now(), condensed: 0, fragile: 0 },
     tasks: DEFAULT_TASKS.map((t) => ({ ...t })),
@@ -38,6 +39,10 @@ export function defaultState(): AppState {
     },
     plan: { primogems: 0, fates: 0, starglitter: 0, banner: 'character', copies: 1, rate: 0.5 },
     anime: [],
+    wishes: [],
+    wishMeta: { overrides: {} },
+    inventory: { weapons: [], artifacts: [], materials: {} },
+    account: {},
   };
 }
 
@@ -65,6 +70,10 @@ export function hydrate(raw: unknown): AppState {
     banners,
     plan: { ...base.plan, ...r.plan },
     anime: Array.isArray(r.anime) ? r.anime : [],
+    wishes: Array.isArray(r.wishes) ? r.wishes : [],
+    wishMeta: { ...base.wishMeta, ...r.wishMeta, overrides: { ...r.wishMeta?.overrides } },
+    inventory: { ...base.inventory, ...r.inventory },
+    account: { ...r.account },
   };
 }
 
