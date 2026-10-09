@@ -49,7 +49,7 @@ export function Stats() {
     <div className="page">
       <AnimeTabs />
       <PageHeader
-        eyebrow={t('nav.anime')}
+       
         title={t('stats.title')}
         subtitle={t('stats.subtitle')}
         actions={

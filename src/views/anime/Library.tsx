@@ -84,7 +84,7 @@ export function Library() {
     <div className="page">
       <AnimeTabs />
       <PageHeader
-        eyebrow={t('nav.anime')}
+       
         title={t('anime.title')}
         subtitle={t.n('anime.subtitle', anime.length, { e: t.num(episodesWatched) })}
         actions={

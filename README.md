@@ -1,73 +1,96 @@
-# ✦ Waypoint
+# Waypoint
 
-**Teyvat & anime, in one place.** Waypoint is a fast, offline-first web app for keeping track of your
-Genshin Impact routine and your anime watchlist, in English or German.
+A Genshin Impact account tracker and anime list in one web app, plus a local exporter that pulls your
+data out of the game and HoYoverse services. English and German UI.
 
-## Features
+## What it does
 
-### Teyvat (Genshin Impact)
-- **Original Resin tracker.** It regenerates live (1 point / 8 min) and shows the time until full plus
-  milestones (40 / 60 / 120 / 160 / cap). Spending keeps the partial regen progress, just like in-game.
-  It also tracks Condensed and Fragile Resin, and can send an optional browser notification when resin is full.
-- **Routine checklist.** Daily, weekly, monthly and cooldown tasks reset on their own at the right
-  **04:00 server time** for America, Europe or Asia. Built-ins include commissions, weekly bosses,
-  Spiral Abyss (16th), Imaginarium Theater (1st) and the Parametric Transformer (7-day cooldown).
-  You can add your own tasks.
-- **Character roster.** All playable characters through Nod-Krai, with filters by element, weapon, rarity and
-  ownership. For each one you can track level, constellation, talents, weapon/refinement, artifacts, build
-  status, favorites and notes. You can add new releases yourself.
-- **Wish tracker.** Pity per banner (character, weapon, standard, chronicled), soft pity indicator, 4★ pity,
-  50/50 guarantee and Epitomized Path state. It keeps a 5★ history with average pity and 50/50 win rate.
-- **Savings planner.** Turns primogems, fates and starglitter into pulls and computes the exact
-  **probability of reaching your goal** (C0–C6 / R1–R5) from your current pity and guarantee, using the
-  community soft-pity model. Also shows expected pulls, the worst case and an interactive probability curve.
+**Genshin Impact**
+- **Wish history**, like paimon.moe: every 5★ with its pity, 50/50 won/lost/guaranteed (click to correct),
+  4★ breakdown, lifetime stats, current pity per banner and a searchable, paged pull log.
+- **Import** from the in-game wish link, UIGF v3/v4 files, paimon.moe backups, GOOD files
+  (Inventory Kamera, Genshin Optimizer, …) and full Waypoint exports. **Export** to UIGF v4.
+- **Characters**: every playable character (generated from game data, with icons). Track level,
+  constellations, talents, weapon and build. Imports fill this in.
+- **Inventory**: weapons, artifacts (with crit value) and materials from GOOD imports.
+- **Today**: live Original Resin, daily/weekly/monthly routine with correct 04:00 server resets, cooldowns.
+- **Planner**: chance to get a featured 5★ (C0–C6 / R1–R5) from your savings, current pity and guarantee.
 
-### Anime
-- **Library.** Statuses (watching, plan to watch, completed, on hold, dropped), one-tap **+1 episode**,
-  scores, rewatches, notes and favorites. Planning switches to watching, and finishing the last episode marks the show completed.
-- **Discover.** Search [AniList](https://anilist.co) or browse trending, this season, next season and all-time popular,
-  then add shows with covers, episode counts and airing data.
-- **Schedule.** A week view of upcoming episodes in your local time, with "new episode" badges when you fall behind.
-  Airing data refreshes in the background.
-- **Stats.** Episodes and time watched, mean score, status breakdown, top genres and score distribution
-  (every chart can also be shown as a table).
+**Anime**: library with one-tap episode progress, AniList search, weekly airing schedule, stats.
 
-### Everywhere
-- Command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> or <kbd>/</kbd>), <kbd>G</kbd> then a letter to jump between sections,
-  <kbd>N</kbd> to add anime.
-- Dark and light themes (or follow the system), English and German UI (UTF-8 throughout).
-- Undo for destructive actions, responsive layout with a bottom tab bar on phones, keyboard and screen-reader friendly.
-- **No account and no server.** Data lives in your browser's `localStorage`; export or import JSON backups in Settings.
+No account, no server: data stays in your browser (`localStorage`). Back up or move it via Settings.
 
-## Getting started
+## Getting your Genshin data in
+
+The wish history and HoYoLAB APIs send no CORS headers, so a website can't call them from your browser.
+There are three ways around that:
+
+### 1. Wish history file (Windows, nothing to install)
+
+Open the game → Wish → History, then run this in PowerShell:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex "&{$((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/Ole-109/test/main/tools/export.ps1'))}"
+```
+
+[`tools/export.ps1`](tools/export.ps1) finds the link in the game's web cache, downloads your complete
+history and saves `waypoint-wishes-<uid>-<date>.json` (UIGF v4) to your Desktop. Drop the file onto
+**Wishes → Import**. Add ` -LinkOnly` inside the quotes to only copy the link.
+
+### 2. Paste the link
+
+Paste the link into **Import → Wish history**. This works with `npm run dev` / `npm run preview`, which
+include a small proxy. On static hosting (GitHub Pages), deploy [`tools/proxy/worker.js`](tools/proxy/worker.js)
+as a Cloudflare Worker and enter its URL under **Settings → Wish import proxy**. The proxy only forwards
+the wish history endpoint.
+
+### 3. Full account export (Node.js 18+)
+
+[`tools/dist/waypoint-export.mjs`](tools/dist/waypoint-export.mjs) is a single-file CLI. It collects:
+
+| Source | What | Needs |
+| --- | --- | --- |
+| Game cache + wish API | complete wish history | the game on this PC |
+| HoYoLAB Battle Chronicle | all characters with level, constellations, talents, weapon, artifacts; live resin, commissions, realm currency, transformer, weekly boss discounts | `ltoken_v2` + `ltuid_v2` cookie, public Battle Chronicle |
+| Enka.Network | showcase characters with full builds | UID only |
+
+```bash
+node waypoint-export.mjs                                   # wishes (+ Enka if the UID is known)
+node waypoint-export.mjs --cookie "ltoken_v2=…; ltuid_v2=…"  # + everything from HoYoLAB
+node waypoint-export.mjs --merge waypoint-export-7000….json  # only fetch new wishes
+node waypoint-export.mjs enka --uid 700000000
+node waypoint-export.mjs --help
+```
+
+From PowerShell, `export.ps1 -Full -Cookie "…"` downloads and runs the CLI for you. The cookie never
+leaves your PC except in requests to HoYoLAB.
+
+**Screen scanners** such as Inventory Kamera produce GOOD files, which Waypoint imports directly
+(characters, constellations, weapons, artifacts, materials).
+
+## Development
 
 ```bash
 npm install
-npm run dev       # http://localhost:5173
-npm test          # unit tests (reset math, resin, gacha model, airing logic)
-npm run build     # production build in dist/
+npm run dev          # http://localhost:5173 (includes the wish-link proxy)
+npm test             # unit tests: resets, resin, gacha model, wish parsing, importers, CLI
+npm run typecheck    # app + build config + CLI
+npm run build        # static site in dist/
+npm run build:cli    # tools/dist/waypoint-export.mjs
+npm run sync-data    # refresh characters/weapons/artifact sets from gi.yatta.moe
 ```
 
-The build uses a relative base path, so `dist/` can be hosted anywhere as static files.
-`.github/workflows/deploy.yml` publishes to **GitHub Pages** on every push to `main`. Enable it under
-*Settings → Pages → Source: GitHub Actions*.
-
-## Tech
-
-React 19 · TypeScript · Vite · lucide icons · Vitest. Anime data comes from the public AniList GraphQL API (no key needed).
-
-## Project layout
+Game data and icons come from [Project Amber](https://gi.yatta.moe) (icons are linked, not bundled).
+Anime data comes from [AniList](https://anilist.co). `.github/workflows/deploy.yml` publishes to GitHub Pages on
+pushes to `main` (enable *Settings → Pages → Source: GitHub Actions*).
 
 ```
-src/
-  lib/          state store, actions, time/reset math, resin, gacha probabilities, AniList client
-  data/         character list and default routine tasks
-  i18n/         English and German strings
-  components/   UI primitives, sheets, toasts, charts, command palette
-  views/        Home, Teyvat (Today, Characters, Wishes), Anime (Library, Schedule, Stats, Discover), Settings
-  styles/       design tokens and styles
+src/core/       wish API client, wish statistics, UIGF/paimon/GOOD formats (shared with the CLI)
+src/lib/        store, actions, import application, resets, resin, gacha model, AniList client
+src/data/       generated game data (game.json) and lookups
+src/views/      Overview, Teyvat (Today, Characters, Inventory, Wishes, Planner, Import), Anime, Settings
+tools/cli/      waypoint-export source (cache search, HoYoLAB, Enka)
+tools/export.ps1, tools/proxy/worker.js
 ```
 
----
-
-Waypoint is a fan project and is not affiliated with HoYoverse or AniList.
+Waypoint is a fan project and is not affiliated with HoYoverse, Enka.Network, Project Amber or AniList.

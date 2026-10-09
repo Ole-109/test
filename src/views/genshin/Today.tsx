@@ -38,7 +38,7 @@ export function Today() {
     <div className="page">
       <TeyvatTabs />
       <PageHeader
-        eyebrow={t('nav.teyvat')}
+       
         title={t('today.title')}
         subtitle={t('today.subtitle', { server: t(`server.${server}`) })}
       />

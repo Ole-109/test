@@ -2,14 +2,16 @@
   "name": "waypoint",
   "private": true,
   "version": "1.0.0",
-  "description": "Waypoint – a Genshin Impact & anime manager",
+  "description": "Waypoint \u2013 a Genshin Impact & anime manager",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tools/cli",
+    "test": "vitest run",
+    "build:cli": "esbuild tools/cli/main.ts --bundle --platform=node --format=esm --target=node18 --outfile=tools/dist/waypoint-export.mjs \"--banner:js=#!/usr/bin/env node\" --log-level=warning",
+    "sync-data": "node scripts/sync-game-data.mjs"
   },
   "dependencies": {
     "lucide-react": "1.40.0",
@@ -17,9 +19,11 @@
     "react-dom": "19.1.9"
   },
   "devDependencies": {
+    "@types/node": "22.15.30",
     "@types/react": "19.1.12",
     "@types/react-dom": "19.1.9",
     "@vitejs/plugin-react": "4.7.0",
+    "esbuild": "0.25.12",
     "typescript": "5.9.3",
     "vite": "6.4.4",
     "vitest": "3.2.4"

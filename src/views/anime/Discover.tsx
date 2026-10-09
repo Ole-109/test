@@ -94,7 +94,7 @@ export function Discover() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow={t('nav.anime')} title={t('discover.title')} subtitle={t('discover.subtitle')} />
+      <PageHeader title={t('discover.title')} subtitle={t('discover.subtitle')} />
 
       <div className="discover-bar">
         <label className="search search-lg">

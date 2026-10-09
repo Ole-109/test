@@ -1,8 +1,10 @@
 import { ArrowRight, Check, Clock, Plus, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ResinCard } from '../components/ResinCard';
-import { Ring } from '../components/ui';
-import { Cover } from '../components/visuals';
+import { PageHeader, Ring } from '../components/ui';
+import { Cover, ItemIcon } from '../components/visuals';
+import { findCharacter } from '../data/characters';
+import { itemVisual } from './genshin/Wishes';
 import { useT } from '../i18n';
 import { toggleTask } from '../lib/actions';
 import { behindBy, displayTitle, occurrences } from '../lib/anime';
@@ -18,21 +20,11 @@ import { taskLabel } from './genshin/Today';
 export function Home() {
   const t = useT();
   const now = useNow(1000);
-  const hour = new Date(now).getHours();
-  const greet =
-    hour < 5 ? t('greet.night') : hour < 12 ? t('greet.morning') : hour < 18 ? t('greet.afternoon') : hour < 23 ? t('greet.evening') : t('greet.night');
   const dateLine = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
 
   return (
     <div className="page home">
-      <header className="home-hero">
-        <div>
-          <div className="eyebrow">{dateLine}</div>
-          <h1>{greet}</h1>
-          <p className="page-sub">{t('home.subtitle')}</p>
-        </div>
-      </header>
-
+      <PageHeader title={t('nav.overview')} subtitle={dateLine} actions={<AccountChip />} />
       <div className="grid-home">
         <ResinCard compact />
         <RoutineCard now={now} />
@@ -40,6 +32,29 @@ export function Home() {
         <ContinueCard now={now} />
         <AiringCard now={now} />
       </div>
+    </div>
+  );
+}
+
+function AccountChip() {
+  const t = useT();
+  const account = useStore((s) => s.account);
+  const uid = account.uid;
+  if (!account.uid && !account.nickname) {
+    return (
+      <a className="btn btn-secondary btn-sm" href={href('/teyvat/import')}>
+        {t('nav.import')}
+      </a>
+    );
+  }
+  return (
+    <div className="account-chip" title={t('home.account')}>
+      <strong>{account.nickname ?? 'Traveler'}</strong>
+      <span className="muted num">
+        {[uid && `UID ${uid}`, account.level && t('home.ar', { n: account.level }), account.worldLevel != null && t('home.wl', { n: account.worldLevel })]
+          .filter(Boolean)
+          .join(' · ')}
+      </span>
     </div>
   );
 }
@@ -109,6 +124,7 @@ function RoutineCard({ now }: { now: number }) {
 function PityCard() {
   const t = useT();
   const banners = useStore((s) => s.banners);
+  const last = banners.character.history[0] ?? banners.weapon.history[0];
   const keys = ['character', 'weapon', 'standard'] as const;
   return (
     <section className="card pity-mini" aria-labelledby="home-pity">
@@ -147,6 +163,16 @@ function PityCard() {
           );
         })}
       </ul>
+      {last && (
+        <div className="last-five">
+          <span className="muted small">{t('home.lastFive')}</span>
+          <span className="row gap-sm">
+            <ItemIcon {...itemVisual({ name: last.name, itemType: findCharacter(last.name) ? 'character' : 'weapon', rank: 5 })} name={last.name} size={28} />
+            <strong>{last.name}</strong>
+            <span className="muted num">{last.pity}</span>
+          </span>
+        </div>
+      )}
     </section>
   );
 }

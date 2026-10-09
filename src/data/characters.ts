@@ -1,125 +1,8 @@
-import type { CharacterDef, Element, Region, Weapon } from '../lib/types';
+import type { CharacterDef, Element, Region, Weapon, WeaponDef } from '../lib/types';
+import game from './game.json';
 
-type Row = [name: string, element: Element, weapon: Weapon, rarity: 4 | 5, region: Region];
-
-const ROWS: Row[] = [
-  ['Traveler', 'adaptive', 'sword', 5, 'other'],
-  // Mondstadt
-  ['Albedo', 'geo', 'sword', 5, 'mondstadt'],
-  ['Amber', 'pyro', 'bow', 4, 'mondstadt'],
-  ['Barbara', 'hydro', 'catalyst', 4, 'mondstadt'],
-  ['Bennett', 'pyro', 'sword', 4, 'mondstadt'],
-  ['Dahlia', 'hydro', 'sword', 4, 'mondstadt'],
-  ['Diluc', 'pyro', 'claymore', 5, 'mondstadt'],
-  ['Diona', 'cryo', 'bow', 4, 'mondstadt'],
-  ['Eula', 'cryo', 'claymore', 5, 'mondstadt'],
-  ['Fischl', 'electro', 'bow', 4, 'mondstadt'],
-  ['Jean', 'anemo', 'sword', 5, 'mondstadt'],
-  ['Kaeya', 'cryo', 'sword', 4, 'mondstadt'],
-  ['Klee', 'pyro', 'catalyst', 5, 'mondstadt'],
-  ['Lisa', 'electro', 'catalyst', 4, 'mondstadt'],
-  ['Mika', 'cryo', 'polearm', 4, 'mondstadt'],
-  ['Mona', 'hydro', 'catalyst', 5, 'mondstadt'],
-  ['Noelle', 'geo', 'claymore', 4, 'mondstadt'],
-  ['Razor', 'electro', 'claymore', 4, 'mondstadt'],
-  ['Rosaria', 'cryo', 'polearm', 4, 'mondstadt'],
-  ['Sucrose', 'anemo', 'catalyst', 4, 'mondstadt'],
-  ['Venti', 'anemo', 'bow', 5, 'mondstadt'],
-  // Liyue
-  ['Baizhu', 'dendro', 'catalyst', 5, 'liyue'],
-  ['Beidou', 'electro', 'claymore', 4, 'liyue'],
-  ['Chongyun', 'cryo', 'claymore', 4, 'liyue'],
-  ['Gaming', 'pyro', 'claymore', 4, 'liyue'],
-  ['Ganyu', 'cryo', 'bow', 5, 'liyue'],
-  ['Hu Tao', 'pyro', 'polearm', 5, 'liyue'],
-  ['Keqing', 'electro', 'sword', 5, 'liyue'],
-  ['Lan Yan', 'anemo', 'catalyst', 4, 'liyue'],
-  ['Ningguang', 'geo', 'catalyst', 4, 'liyue'],
-  ['Qiqi', 'cryo', 'sword', 5, 'liyue'],
-  ['Shenhe', 'cryo', 'polearm', 5, 'liyue'],
-  ['Xiangling', 'pyro', 'polearm', 4, 'liyue'],
-  ['Xianyun', 'anemo', 'catalyst', 5, 'liyue'],
-  ['Xiao', 'anemo', 'polearm', 5, 'liyue'],
-  ['Xingqiu', 'hydro', 'sword', 4, 'liyue'],
-  ['Xinyan', 'pyro', 'claymore', 4, 'liyue'],
-  ['Yanfei', 'pyro', 'catalyst', 4, 'liyue'],
-  ['Yaoyao', 'dendro', 'polearm', 4, 'liyue'],
-  ['Yelan', 'hydro', 'bow', 5, 'liyue'],
-  ['Yun Jin', 'geo', 'polearm', 4, 'liyue'],
-  ['Zhongli', 'geo', 'polearm', 5, 'liyue'],
-  // Inazuma
-  ['Arataki Itto', 'geo', 'claymore', 5, 'inazuma'],
-  ['Chiori', 'geo', 'sword', 5, 'inazuma'],
-  ['Gorou', 'geo', 'bow', 4, 'inazuma'],
-  ['Kaedehara Kazuha', 'anemo', 'sword', 5, 'inazuma'],
-  ['Kamisato Ayaka', 'cryo', 'sword', 5, 'inazuma'],
-  ['Kamisato Ayato', 'hydro', 'sword', 5, 'inazuma'],
-  ['Kirara', 'dendro', 'sword', 4, 'inazuma'],
-  ['Kujou Sara', 'electro', 'bow', 4, 'inazuma'],
-  ['Kuki Shinobu', 'electro', 'sword', 4, 'inazuma'],
-  ['Raiden Shogun', 'electro', 'polearm', 5, 'inazuma'],
-  ['Sangonomiya Kokomi', 'hydro', 'catalyst', 5, 'inazuma'],
-  ['Sayu', 'anemo', 'claymore', 4, 'inazuma'],
-  ['Shikanoin Heizou', 'anemo', 'catalyst', 4, 'inazuma'],
-  ['Thoma', 'pyro', 'polearm', 4, 'inazuma'],
-  ['Yae Miko', 'electro', 'catalyst', 5, 'inazuma'],
-  ['Yoimiya', 'pyro', 'bow', 5, 'inazuma'],
-  ['Yumemizuki Mizuki', 'anemo', 'catalyst', 5, 'inazuma'],
-  // Sumeru
-  ['Alhaitham', 'dendro', 'sword', 5, 'sumeru'],
-  ['Candace', 'hydro', 'polearm', 4, 'sumeru'],
-  ['Collei', 'dendro', 'bow', 4, 'sumeru'],
-  ['Cyno', 'electro', 'polearm', 5, 'sumeru'],
-  ['Dehya', 'pyro', 'claymore', 5, 'sumeru'],
-  ['Dori', 'electro', 'claymore', 4, 'sumeru'],
-  ['Faruzan', 'anemo', 'bow', 4, 'sumeru'],
-  ['Kaveh', 'dendro', 'claymore', 4, 'sumeru'],
-  ['Layla', 'cryo', 'sword', 4, 'sumeru'],
-  ['Nahida', 'dendro', 'catalyst', 5, 'sumeru'],
-  ['Nilou', 'hydro', 'sword', 5, 'sumeru'],
-  ['Sethos', 'electro', 'bow', 4, 'sumeru'],
-  ['Tighnari', 'dendro', 'bow', 5, 'sumeru'],
-  ['Wanderer', 'anemo', 'catalyst', 5, 'sumeru'],
-  // Fontaine
-  ['Arlecchino', 'pyro', 'polearm', 5, 'fontaine'],
-  ['Charlotte', 'cryo', 'catalyst', 4, 'fontaine'],
-  ['Chevreuse', 'pyro', 'polearm', 4, 'fontaine'],
-  ['Clorinde', 'electro', 'sword', 5, 'fontaine'],
-  ['Emilie', 'dendro', 'polearm', 5, 'fontaine'],
-  ['Escoffier', 'cryo', 'polearm', 5, 'fontaine'],
-  ['Freminet', 'cryo', 'claymore', 4, 'fontaine'],
-  ['Furina', 'hydro', 'sword', 5, 'fontaine'],
-  ['Lynette', 'anemo', 'sword', 4, 'fontaine'],
-  ['Lyney', 'pyro', 'bow', 5, 'fontaine'],
-  ['Navia', 'geo', 'claymore', 5, 'fontaine'],
-  ['Neuvillette', 'hydro', 'catalyst', 5, 'fontaine'],
-  ['Sigewinne', 'hydro', 'bow', 5, 'fontaine'],
-  ['Wriothesley', 'cryo', 'catalyst', 5, 'fontaine'],
-  // Natlan
-  ['Chasca', 'anemo', 'bow', 5, 'natlan'],
-  ['Citlali', 'cryo', 'catalyst', 5, 'natlan'],
-  ['Iansan', 'electro', 'polearm', 4, 'natlan'],
-  ['Ifa', 'anemo', 'catalyst', 4, 'natlan'],
-  ['Kachina', 'geo', 'polearm', 4, 'natlan'],
-  ['Kinich', 'dendro', 'claymore', 5, 'natlan'],
-  ['Mavuika', 'pyro', 'claymore', 5, 'natlan'],
-  ['Mualani', 'hydro', 'catalyst', 5, 'natlan'],
-  ['Ororon', 'electro', 'bow', 4, 'natlan'],
-  ['Varesa', 'electro', 'catalyst', 5, 'natlan'],
-  ['Xilonen', 'geo', 'sword', 5, 'natlan'],
-  // Nod-Krai
-  ['Aino', 'hydro', 'claymore', 4, 'nodkrai'],
-  ['Durin', 'pyro', 'sword', 5, 'nodkrai'],
-  ['Flins', 'electro', 'polearm', 5, 'nodkrai'],
-  ['Ineffa', 'electro', 'polearm', 5, 'nodkrai'],
-  ['Jahoda', 'anemo', 'bow', 4, 'nodkrai'],
-  ['Lauma', 'dendro', 'catalyst', 5, 'nodkrai'],
-  ['Nefer', 'dendro', 'catalyst', 5, 'nodkrai'],
-  // Snezhnaya & beyond
-  ['Skirk', 'cryo', 'sword', 5, 'snezhnaya'],
-  ['Tartaglia', 'hydro', 'bow', 5, 'snezhnaya'],
-  ['Aloy', 'cryo', 'bow', 5, 'other'],
-];
+/** Generated by `npm run sync-data` from gi.yatta.moe. */
+export const GAME_DATA_UPDATED: string = game.updated;
 
 export const slug = (name: string) =>
   name
@@ -129,14 +12,126 @@ export const slug = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-export const BASE_CHARACTERS: CharacterDef[] = ROWS.map(([name, element, weapon, rarity, region]) => ({
-  id: slug(name),
-  name,
-  element,
-  weapon,
-  rarity,
-  region,
+/** Loose key for matching names across sources ("RaidenShogun", "raiden_shogun", "Raiden Shogun"). */
+export const looseKey = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+
+export const BASE_CHARACTERS: CharacterDef[] = game.characters.map((c) => ({
+  id: c.id,
+  name: c.name,
+  nameDe: c.nameDe,
+  element: c.element as Element,
+  weapon: c.weapon as Weapon,
+  rarity: c.rarity as 4 | 5,
+  region: c.region as Region,
+  avatarId: c.avatarId,
+  release: c.release,
+  icon: c.icon,
 }));
+
+export const WEAPON_DEFS: WeaponDef[] = game.weapons.map((w) => ({
+  id: w.id,
+  key: w.key,
+  name: w.name,
+  nameDe: w.nameDe,
+  rarity: w.rarity as 1 | 2 | 3 | 4 | 5,
+  type: w.type as Weapon,
+  icon: w.icon,
+}));
+
+export interface ArtifactSetDef {
+  id: number;
+  name: string;
+  nameDe: string;
+  maxRarity: number;
+  icon: string;
+}
+
+export const ARTIFACT_SETS: ArtifactSetDef[] = game.artifactSets;
+
+const setByKey = new Map<string, ArtifactSetDef>();
+for (const a of ARTIFACT_SETS) setByKey.set(looseKey(a.name), a);
+
+/** Looks up an artifact set by GOOD key ("GladiatorsFinale"), name or numeric id. */
+export function findArtifactSet(keyOrId: string | number): ArtifactSetDef | undefined {
+  if (typeof keyOrId === 'number') return ARTIFACT_SETS.find((a) => a.id === keyOrId);
+  return setByKey.get(looseKey(keyOrId));
+}
+
+const charByKey = new Map<string, CharacterDef>();
+for (const c of BASE_CHARACTERS) {
+  charByKey.set(looseKey(c.name), c);
+  if (c.nameDe) charByKey.set(looseKey(c.nameDe), c);
+}
+// Common aliases used by other tools (GOOD keys, paimon.moe ids, in-game short names).
+const ALIASES: Record<string, string> = {
+  raiden: 'raiden-shogun',
+  shogunraiden: 'raiden-shogun',
+  kazuha: 'kaedehara-kazuha',
+  ayaka: 'kamisato-ayaka',
+  ayato: 'kamisato-ayato',
+  kokomi: 'sangonomiya-kokomi',
+  itto: 'arataki-itto',
+  sara: 'kujou-sara',
+  heizou: 'shikanoin-heizou',
+  shinobu: 'kuki-shinobu',
+  childe: 'tartaglia',
+  mizuki: 'yumemizuki-mizuki',
+  scaramouche: 'wanderer',
+};
+const byId = new Map(BASE_CHARACTERS.map((c) => [c.id, c]));
+
+export function findCharacter(name: string): CharacterDef | undefined {
+  const k = looseKey(name);
+  if (k.startsWith('traveler') || k === 'aether' || k === 'lumine') return byId.get('traveler');
+  return charByKey.get(k) ?? byId.get(ALIASES[k] ?? '');
+}
+
+const weaponByKey = new Map<string, WeaponDef>();
+for (const w of WEAPON_DEFS) {
+  weaponByKey.set(looseKey(w.name), w);
+  if (w.nameDe) weaponByKey.set(looseKey(w.nameDe), w);
+}
+const weaponById = new Map(WEAPON_DEFS.map((w) => [w.id, w]));
+
+export function findWeapon(nameOrId: string | number): WeaponDef | undefined {
+  if (typeof nameOrId === 'number') return weaponById.get(nameOrId);
+  return weaponByKey.get(looseKey(nameOrId));
+}
+
+/** Display name in the UI language (game data names are English). */
+export function localName(name: string, lang: string): string {
+  if (lang !== 'de') return name;
+  const c = findCharacter(name);
+  if (c?.nameDe) return c.nameDe;
+  return findWeapon(name)?.nameDe ?? name;
+}
+
+export const characterByAvatarId = (id: number) => BASE_CHARACTERS.find((c) => c.avatarId === id);
+
+/** Icon CDN (Project Amber). Images are only referenced, never bundled. */
+export const iconUrl = (icon?: string) =>
+  icon ? `https://gi.yatta.moe/assets/UI/${icon.startsWith('UI_RelicIcon') ? 'reliquary/' : ''}${icon}.png` : undefined;
+
+/**
+ * 5★ characters in the standard pool, with the date they joined it (ms).
+ * Losing the 50/50 means getting one of these on a character event banner.
+ * Dates mark the end of their own limited banner, so earlier pulls count as wins.
+ */
+export const STANDARD_FIVE_STARS: Record<string, number> = {
+  diluc: 0,
+  jean: 0,
+  keqing: 0,
+  mona: 0,
+  qiqi: 0,
+  tighnari: Date.UTC(2022, 8, 10),
+  dehya: Date.UTC(2023, 2, 22),
+  'yumemizuki-mizuki': Date.UTC(2025, 2, 5),
+};
 
 export const ELEMENTS: Element[] = ['pyro', 'hydro', 'anemo', 'electro', 'dendro', 'cryo', 'geo'];
 export const WEAPONS: Weapon[] = ['sword', 'claymore', 'polearm', 'bow', 'catalyst'];
