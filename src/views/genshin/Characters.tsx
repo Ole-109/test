@@ -34,6 +34,7 @@ export function Characters() {
   const [adding, setAdding] = useState(false);
 
   const ownedCount = all.filter((c) => owned[c.id]).length;
+  const hasWishes = useStore((s) => s.wishes.length > 0);
   const builtCount = all.filter((c) => owned[c.id]?.build === 'built').length;
 
   const list = useMemo(() => {
@@ -66,7 +67,7 @@ export function Characters() {
       <PageHeader
        
         title={t('chars.title')}
-        subtitle={t('chars.subtitle', { owned: ownedCount, total: all.length, built: builtCount })}
+        subtitle={`${t('chars.subtitle', { owned: ownedCount, total: all.length, built: builtCount })}${hasWishes ? ` · ${t('chars.syncedNote')}` : ''}`}
         actions={
           <Button icon={<UserPlus size={16} />} onClick={() => setAdding(true)} title={t('chars.customHint')}>
             {t('chars.addCustom')}
@@ -157,7 +158,11 @@ export function Characters() {
                   </div>
                   <span className="char-tile-name">{t.lang === 'de' && c.nameDe ? c.nameDe : c.name}</span>
                   <span className="char-tile-meta num">
-                    {o ? (
+                    {o?.detailsKnown === false ? (
+                      <span className="muted" title={t('chars.fromWishesHint')}>
+                        {t('chars.fromWishes', { n: o.wishCopies ?? 1 })}
+                      </span>
+                    ) : o ? (
                       <>
                         Lv {o.level} · {o.talents.join('/')}
                         <span className={`build-dot build-${o.build}`} title={t(`chars.build.${o.build}`)} />

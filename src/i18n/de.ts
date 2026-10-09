@@ -528,4 +528,9 @@ export const de: Record<MessageKey, string> = {
   "home.ar": "AR {n}",
   "home.wl": "WS {n}",
   "home.lastFive": "Letzter 5★",
+  "chars.fromWishes": "{n}× gezogen",
+  "chars.fromWishesHint": "Aus deinem Gebetsverlauf übernommen. Öffne ihn, um Stufe und Talente einzutragen, oder importiere von HoYoLAB / Inventory Kamera.",
+  "chars.syncedNote": "Charaktere und Konstellationen kommen aus deinem Gebetsverlauf",
+  "chars.wishCopies": "{n}× im Gebetsverlauf gezogen. Konstellationen werden passend erhöht, nie gesenkt.",
+  "import.charsFromWishes": "Aus dem Gebetsverlauf: {added} Charaktere hinzugefügt, {raised} Konstellationen erhöht",
 };

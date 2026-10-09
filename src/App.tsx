@@ -26,6 +26,7 @@ import { Logo } from './components/visuals';
 import { BASE_CHARACTERS } from './data/characters';
 import { translate, useT } from './i18n';
 import { setSetting } from './lib/actions';
+import { ensureCharacterSync } from './lib/importActions';
 import { useHotkey, useMediaQuery } from './lib/hooks';
 import { resinAt } from './lib/resin';
 import { href, navigate, useRoute, type Route } from './lib/router';
@@ -124,6 +125,8 @@ export function App() {
   const goPending = useRef(0);
   const mainRef = useRef<HTMLElement>(null);
   useResinNotifier();
+  // Wish data imported before roster sync existed: fill owned characters once.
+  useEffect(() => ensureCharacterSync(), []);
 
   useEffect(() => {
     document.documentElement.lang = lang;

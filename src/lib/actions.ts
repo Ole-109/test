@@ -107,7 +107,7 @@ export function setOwned(id: string, owned: boolean) {
 }
 
 export function patchCharacter(id: string, patch: Partial<OwnedCharacter>) {
-  update('characters', (cs) => ({ ...cs, [id]: { ...(cs[id] ?? newOwned()), ...patch, updatedAt: Date.now() } }));
+  update('characters', (cs) => ({ ...cs, [id]: { ...(cs[id] ?? newOwned()), detailsKnown: true, ...patch, updatedAt: Date.now() } }));
 }
 
 // ── Wishes ───────────────────────────────────────────────────────────────

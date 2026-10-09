@@ -526,6 +526,11 @@ export const en = {
   "home.ar": "AR {n}",
   "home.wl": "WL {n}",
   "home.lastFive": "Last 5★",
+  "chars.fromWishes": "{n}× pulled",
+  "chars.fromWishesHint": "Added from your wish history. Open it to fill in level and talents, or import from HoYoLAB / Inventory Kamera.",
+  "chars.syncedNote": "owned characters and constellations come from your wish history",
+  "chars.wishCopies": "Pulled {n}× in your wish history. Constellations are raised to match, never lowered.",
+  "import.charsFromWishes": "From wish history: {added} characters added, {raised} constellations raised",
 } as const;
 
 export type MessageKey = keyof typeof en;
