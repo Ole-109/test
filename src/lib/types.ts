@@ -174,6 +174,11 @@ export interface WishPlan {
   copies: number;
   /** Featured win rate for the character banner (0.5 or 0.55 with Capturing Radiance). */
   rate: number;
+  /** Savings forecast: target date (YYYY-MM-DD, empty = off) and income. */
+  targetDate: string;
+  dailyPrimos: number;
+  welkin: boolean;
+  monthlyPrimos: number;
 }
 
 export type AnimeStatus = 'watching' | 'planning' | 'completed' | 'paused' | 'dropped';

@@ -162,12 +162,23 @@ export function HBars({ data, format, label }: { data: Datum[]; format: (v: numb
 }
 
 /** Vertical columns with a hover tooltip (scores 1–10). */
-export function Columns({ data, label, tip }: { data: Datum[]; label: string; tip: (d: Datum) => ReactNode }) {
+export function Columns({
+  data,
+  label,
+  tip,
+  labelEvery = 1,
+}: {
+  data: Datum[];
+  label: string;
+  tip: (d: Datum) => ReactNode;
+  /** Show every n-th axis label when there are many columns. */
+  labelEvery?: number;
+}) {
   const max = Math.max(1, ...data.map((d) => d.value));
   const [hover, setHover] = useState<string | null>(null);
   return (
-    <div className="columns" role="img" aria-label={label}>
-      {data.map((d) => (
+    <div className="columns" role="img" aria-label={label} style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
+      {data.map((d, i) => (
         <div
           key={d.key}
           className={`col ${hover && hover !== d.key ? 'is-dim' : ''}`}
@@ -178,7 +189,7 @@ export function Columns({ data, label, tip }: { data: Datum[]; label: string; ti
             {hover === d.key && <div className="viz-tip col-tip">{tip(d)}</div>}
             <div className="col-fill" style={{ height: `${(d.value / max) * 100}%` }} />
           </div>
-          <span className="col-label num">{d.label}</span>
+          <span className="col-label num">{i % labelEvery === 0 ? d.label : '\u00a0'}</span>
         </div>
       ))}
     </div>

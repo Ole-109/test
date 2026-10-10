@@ -59,7 +59,7 @@ function Find-GameDataDir {
     foreach ($file in @('output_log.txt', 'Player.log')) {
       $log = Join-Path (Get-HomeDir) "AppData\LocalLow\miHoYo\$folder\$file"
       if (-not (Test-Path -LiteralPath $log)) { continue }
-      $text = Get-Content -LiteralPath $log -Raw -ErrorAction SilentlyContinue
+      $text = Get-Content -LiteralPath $log -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
       if (-not $text) { continue }
       $m = [regex]::Match($text, '([A-Za-z]:[\\/][^\r\n:]*?(GenshinImpact_Data|YuanShen_Data))')
       if ($m.Success -and (Test-Path -LiteralPath $m.Groups[1].Value)) { return $m.Groups[1].Value }

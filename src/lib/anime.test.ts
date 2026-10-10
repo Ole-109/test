@@ -58,6 +58,14 @@ describe('anime helpers', () => {
     expect(withProgress(a, 5).progress).toBe(2);
   });
 
+  it('undoing the last episode re-opens a completed show', () => {
+    const done = withProgress(entry({ episodes: 2, progress: 1 }), 2, 5);
+    expect(done.status).toBe('completed');
+    const back = withProgress(done, 1, 9);
+    expect(back.status).toBe('watching');
+    expect(back.completedAt).toBeUndefined();
+  });
+
   it('completing fills progress', () => {
     expect(withStatus(entry({ episodes: 24, progress: 3 }), 'completed').progress).toBe(24);
   });

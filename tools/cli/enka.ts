@@ -42,14 +42,19 @@ export interface EnkaResponse {
 
 export type SkillOrder = Record<string, number[]>;
 
-export async function fetchEnka(http: Http, uid: string): Promise<{ data: EnkaResponse; skillOrder: SkillOrder }> {
-  const data = await http.json<EnkaResponse>(`https://enka.network/api/uid/${encodeURIComponent(uid)}/`);
+/** Normal attack / skill / burst ids per avatar id, from Enka's public data store. */
+export async function fetchSkillOrder(http: Http): Promise<SkillOrder> {
   const store = await http.json<Record<string, { SkillOrder?: number[] }>>(
     'https://raw.githubusercontent.com/EnkaNetwork/API-docs/master/store/characters.json',
   );
   const skillOrder: SkillOrder = {};
   for (const [id, c] of Object.entries(store)) if (c.SkillOrder) skillOrder[id] = c.SkillOrder;
-  return { data, skillOrder };
+  return skillOrder;
+}
+
+export async function fetchEnka(http: Http, uid: string): Promise<{ data: EnkaResponse; skillOrder: SkillOrder }> {
+  const data = await http.json<EnkaResponse>(`https://enka.network/api/uid/${encodeURIComponent(uid)}/`);
+  return { data, skillOrder: await fetchSkillOrder(http) };
 }
 
 /** Converts an Enka response to GOOD + account info. */

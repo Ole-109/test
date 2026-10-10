@@ -66,9 +66,11 @@ const GACHA_TYPES = new Set(['100', '200', '301', '400', '302', '500']);
 function itemKind(name: string, itemType?: string, itemId?: string): 'character' | 'weapon' {
   if (itemId && /^1\d{7}$/.test(itemId)) return 'character';
   if (itemId && /^\d{5}$/.test(itemId)) return 'weapon';
+  // An explicit item type wins over guessing from the name.
+  if (/weapon|waffe|arme|arma|武器|무기/i.test(itemType ?? '')) return 'weapon';
+  if (/character|figur|personnage|personaje|角色|캐릭터/i.test(itemType ?? '')) return 'character';
   if (findCharacter(name)) return 'character';
-  if (findWeapon(name)) return 'weapon';
-  return /weapon|waffe|arme|arma|武器|무기/i.test(itemType ?? '') ? 'weapon' : 'character';
+  return findWeapon(name) ? 'weapon' : 'character';
 }
 
 function rankOf(name: string, kind: 'character' | 'weapon', rank?: string): 3 | 4 | 5 {
@@ -200,6 +202,9 @@ export function parseImport(text: string): ImportResult {
   }
   if (!json || typeof json !== 'object') throw new ImportError('Unrecognised file.');
 
+  if ((json.app === 'waypoint' && json.data) || ('settings' in json && 'tasks' in json)) {
+    throw new ImportError('This is a Waypoint backup. Restore it under Settings → Import backup.');
+  }
   if (json.format === 'waypoint-export') {
     const b = json as unknown as WaypointBundle;
     const wishes = b.uigf ? parseUigf(b.uigf as unknown as Record<string, unknown>).wishes : undefined;

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CommandPalette } from './components/CommandPalette';
-import { Toaster } from './components/toast';
+import { toast, Toaster } from './components/toast';
 import { Kbd } from './components/ui';
 import { Logo } from './components/visuals';
 import { BASE_CHARACTERS } from './data/characters';
@@ -30,7 +30,7 @@ import { ensureCharacterSync } from './lib/importActions';
 import { useHotkey, useMediaQuery } from './lib/hooks';
 import { resinAt } from './lib/resin';
 import { href, navigate, useRoute, type Route } from './lib/router';
-import { getState, useStore } from './lib/store';
+import { getState, onPersistError, useStore } from './lib/store';
 import { syncAiring } from './lib/sync';
 import { setUI, useUI } from './lib/ui';
 import { AnimeSheet } from './views/anime/AnimeSheet';
@@ -127,6 +127,19 @@ export function App() {
   useResinNotifier();
   // Wish data imported before roster sync existed: fill owned characters once.
   useEffect(() => ensureCharacterSync(), []);
+  // Browser storage full: say so instead of silently losing changes on reload.
+  useEffect(
+    () =>
+      onPersistError(() =>
+        toast({
+          message: t('common.storageFull'),
+          tone: 'error',
+          duration: 15000,
+          action: { label: t('nav.settings'), run: () => navigate('/settings') },
+        }),
+      ),
+    [t],
+  );
 
   useEffect(() => {
     document.documentElement.lang = lang;

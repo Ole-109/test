@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { gameDirFromLog, searchWishUrls } from './cache';
 import { enkaToGood, type EnkaResponse } from './enka';
-import { dailyNoteToRealtime, hoyolabToGood, makeDS, normaliseCookie, serverForUid } from './hoyolab';
+import { baseTalents, dailyNoteToRealtime, hoyolabToGood, makeDS, normaliseCookie, serverForUid } from './hoyolab';
 
 const tmp = mkdtempSync(join(tmpdir(), 'waypoint-test-'));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -125,5 +125,26 @@ describe('HoYoLAB', () => {
     );
     expect(rt.resin).toEqual({ current: 120, max: 200, recoverySeconds: 38400 });
     expect(rt.transformerReadyInSeconds).toBe(26 * 3600);
+  });
+
+  it('removes constellation boosts from talent levels', () => {
+    const ayaka = {
+      base: { id: 10000002, name: 'Kamisato Ayaka', level: 90, actived_constellation_num: 3 },
+      skills: [
+        { skill_id: 10024, skill_type: 1, level: 9, name: 'Normal Attack: Kamisato Art: Kabuki' },
+        { skill_id: 10018, skill_type: 1, level: 10, name: 'Kamisato Art: Hyouka' },
+        { skill_id: 10019, skill_type: 1, level: 13, name: 'Kamisato Art: Soumetsu' },
+        { skill_id: 10013, skill_type: 1, level: 1, name: 'Kamisato Art: Senho' },
+      ],
+      constellations: [
+        { pos: 3, is_actived: true, effect: 'Increases the Level of <color=#FFD780FF>Kamisato Art: Soumetsu</color> by 3. Maximum upgrade level is 15.' },
+        { pos: 5, is_actived: false, effect: 'Increases the Level of Kamisato Art: Hyouka by 3. Maximum upgrade level is 15.' },
+      ],
+    };
+    // Skill order from the game data: the sprint must not be mistaken for the burst.
+    expect(baseTalents(ayaka, [10024, 10018, 10019])).toEqual({ auto: 9, skill: 10, burst: 10 });
+    // C5 active: a boosted 10 is really a 7.
+    const c5 = { ...ayaka, constellations: ayaka.constellations.map((c) => ({ ...c, is_actived: true })) };
+    expect(baseTalents(c5, [10024, 10018, 10019])).toEqual({ auto: 9, skill: 7, burst: 10 });
   });
 });

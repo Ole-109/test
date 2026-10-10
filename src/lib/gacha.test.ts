@@ -48,3 +48,40 @@ describe('gacha model', () => {
     expect(totalPulls(1600, 3, 12)).toBe(10 + 3 + 2);
   });
 });
+
+import { fiftyLuck, normalCdf, pityLuck, pityMoments } from './gacha';
+
+describe('luck rating', () => {
+  it('matches the known pity distribution', () => {
+    const { mean, sd } = pityMoments(RULES.character);
+    expect(mean).toBeGreaterThan(61);
+    expect(mean).toBeLessThan(64);
+    expect(sd).toBeGreaterThan(10);
+    expect(normalCdf(0)).toBeCloseTo(0.5, 6);
+    expect(normalCdf(1.96)).toBeCloseTo(0.975, 3);
+  });
+
+  it('rates low average pity as lucky', () => {
+    expect(pityLuck(40, 10, RULES.character)).toBeGreaterThan(0.99);
+    expect(pityLuck(85, 10, RULES.character)).toBeLessThan(0.01);
+    expect(pityLuck(pityMoments(RULES.character).mean, 5, RULES.character)).toBeCloseTo(0.5, 5);
+  });
+
+  it('rates 50/50 records with the binomial distribution', () => {
+    expect(fiftyLuck(5, 10)).toBeCloseTo(0.5, 6);
+    expect(fiftyLuck(10, 10)).toBeGreaterThan(0.99);
+    expect(fiftyLuck(0, 10)).toBeLessThan(0.01);
+  });
+});
+
+import { projectedPrimogems } from './gacha';
+
+describe('savings forecast', () => {
+  it('adds daily, Welkin and monthly income', () => {
+    expect(projectedPrimogems(0, { daily: 60, welkin: true, monthly: 1600 })).toBe(0);
+    expect(projectedPrimogems(10, { daily: 60, welkin: false, monthly: 0 })).toBe(600);
+    expect(projectedPrimogems(10, { daily: 60, welkin: true, monthly: 0 })).toBe(1500);
+    // One average month of monthly income.
+    expect(projectedPrimogems(365.25 / 12, { daily: 0, welkin: false, monthly: 1600 })).toBe(1600);
+  });
+});

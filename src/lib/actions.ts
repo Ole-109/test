@@ -1,5 +1,6 @@
 import { withProgress, withStatus } from './anime';
 import { resinAt, setResin } from './resin';
+import { findCharacter } from '../data/characters';
 import { getState, setState, uid, update } from './store';
 import type {
   AnimeEntry,
@@ -160,6 +161,11 @@ export function logFive(banner: BannerKey, rec: Omit<FiveStarRecord, 'id' | 'at'
       },
     };
   });
+  // A logged character is now owned (level and talents still unknown).
+  const c = findCharacter(rec.name);
+  if (c && !getState().characters[c.id]) {
+    update('characters', (cs) => ({ ...cs, [c.id]: { ...newOwned(), detailsKnown: false, wishCopies: 1 } }));
+  }
 }
 
 export function removeFive(banner: BannerKey, id: string) {

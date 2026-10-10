@@ -92,6 +92,8 @@ export function Characters() {
         />
       </div>
 
+      <Collection all={all} owned={owned} />
+
       <div className="toolbar toolbar-filters">
         <div className="el-filter" role="group" aria-label={t('chars.element')}>
           {ELEMENTS.map((e) => {
@@ -298,5 +300,28 @@ function CustomCharacterSheet({ open, onClose }: { open: boolean; onClose: () =>
         </Field>
       </form>
     </Sheet>
+  );
+}
+
+/** Owned / total per rarity and element, clickable to filter. */
+function Collection({ all, owned }: { all: CharacterDef[]; owned: Record<string, unknown> }) {
+  const t = useT();
+  const count = (list: CharacterDef[]) => `${list.filter((c) => owned[c.id]).length}/${list.length}`;
+  const playable = all.filter((c) => c.id !== 'traveler');
+  return (
+    <div className="collection" aria-label={t('chars.collection')}>
+      <span className="collection-item">
+        <span className="text-r5">5★</span> <span className="num">{count(playable.filter((c) => c.rarity === 5))}</span>
+      </span>
+      <span className="collection-item">
+        <span className="text-r4">4★</span> <span className="num">{count(playable.filter((c) => c.rarity === 4))}</span>
+      </span>
+      {ELEMENTS.map((e) => (
+        <span key={e} className="collection-item" title={t(`el.${e}`)}>
+          <ElementIcon element={e} size={13} />
+          <span className="num">{count(playable.filter((c) => c.element === e))}</span>
+        </span>
+      ))}
+    </div>
   );
 }

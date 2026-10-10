@@ -15,7 +15,7 @@ import type { GoodData } from '../../src/core/good';
 import { POOL_OF } from '../../src/core/wishStats';
 import type { Account, WishRecord } from '../../src/lib/types';
 import { searchWishUrls } from './cache';
-import { enkaToGood, fetchEnka } from './enka';
+import { enkaToGood, fetchEnka, fetchSkillOrder } from './enka';
 import { accountFromIndex, dailyNoteToRealtime, Hoyolab, hoyolabToGood, normaliseCookie } from './hoyolab';
 import { createHttp } from './http';
 
@@ -217,7 +217,8 @@ async function main() {
       step(`Reading Battle Chronicle for UID ${uid}…`);
       account = { ...account, ...accountFromIndex(uid, await hl.index(uid)) };
       const chars = await hl.characters(uid);
-      good = hoyolabToGood(chars);
+      const skillOrder = await fetchSkillOrder(http).catch(() => ({}));
+      good = hoyolabToGood(chars, skillOrder);
       ok(`${good.characters?.length} characters, ${good.weapons?.length} equipped weapons, ${good.artifacts?.length} equipped artifacts`);
       try {
         realtime = dailyNoteToRealtime(await hl.dailyNote(uid));
