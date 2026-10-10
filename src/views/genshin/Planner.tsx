@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { ProbabilityCurve } from '../../components/charts';
-import { Field, PageHeader, Segmented, Stepper } from '../../components/ui';
+import { Field, PageHeader, Segmented, Stepper, Switch } from '../../components/ui';
 import { useT } from '../../i18n';
-import { expectedPulls, featuredCurve, PRIMOS_PER_PULL, RULES, totalPulls, worstCase } from '../../lib/gacha';
+import { expectedPulls, featuredCurve, PRIMOS_PER_PULL, projectedPrimogems, RULES, totalPulls, worstCase } from '../../lib/gacha';
 import { update, useStore } from '../../lib/store';
 import { TeyvatTabs } from './TeyvatTabs';
 
@@ -49,6 +49,15 @@ function Planner() {
   const expected = expectedPulls(curve);
   const shortPrimos = Math.max(0, (worst - pulls) * PRIMOS_PER_PULL);
   const maxCopies = plan.banner === 'character' ? 7 : 5;
+
+  // Forecast: income until the target date (e.g. the banner you are saving for).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = plan.targetDate ? new Date(`${plan.targetDate}T00:00:00`) : null;
+  const days = target ? Math.max(0, Math.round((target.getTime() - today.getTime()) / 86_400_000)) : 0;
+  const income = projectedPrimogems(days, { daily: plan.dailyPrimos, welkin: plan.welkin, monthly: plan.monthlyPrimos });
+  const futurePulls = totalPulls(plan.primogems + income, plan.fates, plan.starglitter);
+  const futureChance = curve[Math.min(futurePulls, curve.length - 1)];
 
   return (
     <section className="card planner-card" aria-label={t('wish.planner')}>
@@ -109,6 +118,32 @@ function Planner() {
             </Field>
           )}
           <p className="muted small">{t('wish.usesPity', { banner: t(`wish.banner.${plan.banner}`) })}</p>
+
+          <div className="forecast-inputs">
+            <Field label={t('plan.saveUntil')} htmlFor="plan-date" hint={t('plan.saveUntilHint')}>
+              <input
+                id="plan-date"
+                className="input"
+                type="date"
+                value={plan.targetDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setPlan({ targetDate: e.target.value })}
+              />
+            </Field>
+            {plan.targetDate && (
+              <>
+                <div className="form-row">
+                  <Field label={t('plan.daily')}>
+                    <Stepper size="sm" label={t('plan.daily')} value={plan.dailyPrimos} step={10} max={1000} onChange={(dailyPrimos) => setPlan({ dailyPrimos })} />
+                  </Field>
+                  <Field label={t('plan.monthly')}>
+                    <Stepper size="sm" label={t('plan.monthly')} value={plan.monthlyPrimos} step={100} max={20000} onChange={(monthlyPrimos) => setPlan({ monthlyPrimos })} />
+                  </Field>
+                </div>
+                <Switch checked={plan.welkin} onChange={(welkin) => setPlan({ welkin })} label={t('plan.welkin')} />
+              </>
+            )}
+          </div>
         </div>
 
         <div className="planner-result">
@@ -130,6 +165,15 @@ function Planner() {
               <strong className="num">{t.num(shortPrimos)}</strong>
             </div>
           </div>
+          {target && (
+            <div className="forecast">
+              <span className="muted small">{t('plan.byDate', { date: new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' }).format(target) })}</span>
+              <span>
+                {t('plan.forecast', { primos: t.num(income), pulls: t.num(futurePulls) })} →{' '}
+                <strong className={futureChance >= 0.75 ? 'text-good' : futureChance >= 0.4 ? 'text-r5' : 'text-bad'}>{pct(futureChance, t.lang)}</strong>
+              </span>
+            </div>
+          )}
           <ProbabilityCurve
             curve={curve}
             marker={pulls}

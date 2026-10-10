@@ -24,6 +24,8 @@ describe('game data lookups', () => {
     expect(findCharacter('KaedeharaKazuha')?.name).toBe('Kaedehara Kazuha');
     expect(findWeapon('FreedomSworn')?.name).toBe('Freedom-Sworn');
     expect(findWeapon('the_catch')?.rarity).toBe(4);
+    expect(findCharacter("Traveler's Handy Sword")).toBeUndefined();
+    expect(findWeapon("Traveler's Handy Sword")?.rarity).toBe(3);
   });
 });
 
@@ -174,6 +176,19 @@ describe('import formats', () => {
     const bundle = parseImport(JSON.stringify({ format: 'waypoint-export', version: 1, exportedAt: '', source: 'x', uigf: toUigfV4([rec('1', 'Furina', 5)], '7') }));
     expect(bundle.kind).toBe('waypoint');
     expect(bundle.wishes?.records).toHaveLength(1);
+  });
+
+  it('keeps explicit weapon types even when the name looks like a character', () => {
+    const r = parseImport(JSON.stringify({
+      info: { uid: '1', uigf_version: 'v3.0' },
+      list: [{ id: '1', gacha_type: '200', name: "Traveler's Handy Sword", item_type: 'Weapon', rank_type: '3', time: '2024-01-01 00:00:00' }],
+    }));
+    expect(r.wishes?.records[0].itemType).toBe('weapon');
+  });
+
+  it('points Waypoint backups to Settings', () => {
+    expect(() => parseImport(JSON.stringify({ app: 'waypoint', data: { settings: {} } }))).toThrow(/Settings/);
+    expect(() => parseImport(JSON.stringify({ version: 1, settings: {}, tasks: [] }))).toThrow(/Settings/);
   });
 
   it('rejects unknown files', () => {

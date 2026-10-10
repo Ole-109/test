@@ -144,7 +144,8 @@ export interface HoyoCharacterDetail {
     main_property?: { property_type: number; value: string };
     sub_property_list?: { property_type: number; value: string }[];
   }[];
-  skills?: { skill_id: number; skill_type: number; level: number }[];
+  skills?: { skill_id: number; skill_type: number; level: number; name?: string }[];
+  constellations?: { pos: number; is_actived: boolean; effect: string }[];
 }
 
 export interface HoyoDailyNote {
@@ -163,24 +164,62 @@ export interface HoyoDailyNote {
 const POS: Record<number, ArtifactSlot> = { 1: 'flower', 2: 'plume', 3: 'sands', 4: 'goblet', 5: 'circlet' };
 const num = (v: string) => parseFloat(v.replace('%', ''));
 
-/** Converts Battle Chronicle character details to GOOD. */
-export function hoyolabToGood(list: HoyoCharacterDetail[]): GoodData {
+type Talent = 'auto' | 'skill' | 'burst';
+
+/**
+ * Base talent levels (GOOD wants them without constellation boosts). HoYoLAB shows
+ * boosted levels; the active constellations' descriptions say which talent got +3.
+ */
+export function baseTalents(c: HoyoCharacterDetail, order?: number[]): Record<Talent, number> {
+  const skills = c.skills ?? [];
+  const active = skills.filter((s) => s.skill_type === 1);
+  const byId = (id?: number) => (id == null ? undefined : skills.find((s) => s.skill_id === id));
+  // Prefer the game's own skill ids; fall back to "normal attack first, burst last".
+  const picked =
+    order && order.length >= 3 && order.every((id) => byId(id))
+      ? { auto: byId(order[0]), skill: byId(order[1]), burst: byId(order[2]) }
+      : { auto: active[0], skill: active[1], burst: active[active.length - 1] };
+
+  const boosted = new Set<Talent>();
+  const known = (c.constellations ?? []).length > 0;
+  for (const con of c.constellations ?? []) {
+    if (!con.is_actived) continue;
+    const text = con.effect.replace(/<[^>]+>/g, '');
+    if (!/by\s*3\b/i.test(text)) continue;
+    // In-game wording names the skill ("…Level of Kamisato Art: Hyouka by 3"); older
+    // texts use the generic "Elemental Skill"/"Elemental Burst".
+    for (const t of ['auto', 'skill', 'burst'] as Talent[]) {
+      const name = picked[t]?.name;
+      if (name && text.includes(name)) boosted.add(t);
+    }
+    const generic = text.match(/(Normal Attack|Elemental Skill|Elemental Burst)[^.]*?by\s*3/i)?.[1].toLowerCase();
+    if (generic) boosted.add(generic === 'normal attack' ? 'auto' : generic === 'elemental skill' ? 'skill' : 'burst');
+  }
+  const base = (t: Talent) => {
+    const level = picked[t]?.level ?? 1;
+    if (known) return Math.max(1, level - (boosted.has(t) ? 3 : 0));
+    return level > 10 ? level - 3 : level; // no constellation data: best guess
+  };
+  const out = { auto: base('auto'), skill: base('skill'), burst: base('burst') };
+  // Tartaglia's passive raises every party member's Normal Attack by 1, including his own.
+  if (findCharacter(c.base.name)?.id === 'tartaglia' && out.auto > 1) out.auto -= 1;
+  return out;
+}
+
+/** Converts Battle Chronicle character details to GOOD. `skillOrder` maps avatar id → [NA, E, Q] skill ids. */
+export function hoyolabToGood(list: HoyoCharacterDetail[], skillOrder: Record<string, number[]> = {}): GoodData {
   const characters: GoodCharacter[] = [];
   const weapons: GoodWeapon[] = [];
   const artifacts: GoodArtifact[] = [];
   for (const c of list) {
     const def = findCharacter(c.base.name);
     const key = toGoodKey(def?.name ?? c.base.name);
-    // Active skills: normal attack first, burst last. HoYoLAB levels include
-    // constellation boosts (+3), GOOD wants base levels.
-    const active = (c.skills ?? []).filter((s) => s.skill_type === 1);
-    const base = (l?: number) => (l == null ? 1 : l > 10 ? l - 3 : l);
     characters.push({
       key,
       level: c.base.level,
       ascension: ascensionForLevel(c.base.level),
       constellation: c.base.actived_constellation_num,
-      talent: { auto: base(active[0]?.level), skill: base(active[1]?.level), burst: base(active[active.length - 1]?.level) },
+      talent: baseTalents(c, skillOrder[String(c.base.id)]),
     });
     if (c.weapon) {
       weapons.push({

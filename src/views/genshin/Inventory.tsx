@@ -158,6 +158,7 @@ function Artifacts() {
           <ArtifactCard key={i} a={a} cv={cv} setName={setName(a.setKey)} />
         ))}
       </div>
+      {rows.length > 300 && <p className="muted small center">{t('inv.truncated', { n: 300, total: t.num(rows.length) })}</p>}
     </>
   );
 }

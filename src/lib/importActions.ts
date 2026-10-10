@@ -1,7 +1,7 @@
 import { findCharacter, findWeapon } from '../data/characters';
 import { fromGoodKey, setSummary, type GoodData } from '../core/good';
 import { mergeWishes, type ImportResult, type Realtime } from '../core/formats';
-import { analyzePool, BANNER_POOLS, POOL_OF } from '../core/wishStats';
+import { analyzePool, BANNER_POOLS, characterCopies, POOL_OF } from '../core/wishStats';
 import { newOwned } from './actions';
 import { RESIN_INTERVAL } from './resin';
 import { getState, setState } from './store';
@@ -14,6 +14,8 @@ export interface ImportSummary {
   wishesAdded: number;
   wishesTotal: number;
   characters: number;
+  /** Characters added / constellations raised from the wish history. */
+  fromWishes: { added: number; raised: number };
   weapons: number;
   artifacts: number;
   unknown: string[];
@@ -61,7 +63,9 @@ function applyGood(s: AppState, good: GoodData, summary: ImportSummary): AppStat
       ...prev,
       level: gc.level || prev.level,
       ascension: gc.ascension,
-      constellation: gc.constellation ?? prev.constellation,
+      // Exact data from the game; still never below what the wish history proves.
+      constellation: Math.max(gc.constellation ?? prev.constellation, prev.wishCopies ? Math.min(6, prev.wishCopies - 1) : 0),
+      detailsKnown: true,
       talents: [gc.talent?.auto ?? 1, gc.talent?.skill ?? 1, gc.talent?.burst ?? 1],
       updatedAt: now,
     };
@@ -133,9 +137,58 @@ function applyRealtime(s: AppState, rt: Realtime, summary: ImportSummary): AppSt
   return next;
 }
 
+/** Characters every account receives in the story (Prologue): Traveler, Amber, Kaeya, Lisa. */
+const STORY_CHARACTERS = ['traveler', 'amber', 'kaeya', 'lisa'];
+
+/**
+ * Marks every character found in the wish history as owned and raises its
+ * constellation to (copies − 1), capped at C6. Never lowers anything: characters
+ * from other sources (quests, events, the shop) or exact data from HoYoLAB/GOOD
+ * imports stay as they are.
+ */
+export function syncCharactersFromWishes(s: AppState): { state: AppState; added: number; raised: number } {
+  const copies = characterCopies(s.wishes);
+  const characters = { ...s.characters };
+  const now = Date.now();
+  let added = 0;
+  let raised = 0;
+  const created = new Set<string>();
+  // Every account gets these through the story, so a pulled copy is already a duplicate.
+  for (const id of STORY_CHARACTERS) {
+    if (s.wishes.length && !characters[id]) {
+      characters[id] = { ...newOwned(), detailsKnown: false, updatedAt: now };
+      created.add(id);
+      added++;
+    }
+  }
+  for (const { id, copies: pulled } of copies.values()) {
+    const n = pulled + (STORY_CHARACTERS.includes(id) ? 1 : 0);
+    const derived = Math.min(6, n - 1);
+    const prev = characters[id];
+    if (!prev) {
+      characters[id] = { ...newOwned(), constellation: derived, wishCopies: pulled, detailsKnown: false, updatedAt: now };
+      added++;
+    } else if (prev.constellation < derived || prev.wishCopies !== pulled) {
+      if (prev.constellation < derived && !created.has(id)) raised++;
+      characters[id] = { ...prev, constellation: Math.max(prev.constellation, derived), wishCopies: pulled };
+    }
+  }
+  return {
+    state: { ...s, characters, wishMeta: { ...s.wishMeta, charSync: s.wishes.length } },
+    added,
+    raised,
+  };
+}
+
+/** Runs the roster sync once for wish data imported before this feature existed. */
+export function ensureCharacterSync() {
+  const s = getState();
+  if (s.wishes.length && s.wishMeta.charSync !== s.wishes.length) setState(syncCharactersFromWishes(s).state);
+}
+
 /** Applies an import result to the store. Returns a summary for the UI. */
 export function applyImport(result: ImportResult): ImportSummary {
-  const summary: ImportSummary = { hadWishes: !!result.wishes?.records.length, wishesAdded: 0, wishesTotal: 0, characters: 0, weapons: 0, artifacts: 0, unknown: [], realtime: false };
+  const summary: ImportSummary = { hadWishes: !!result.wishes?.records.length, wishesAdded: 0, wishesTotal: 0, characters: 0, fromWishes: { added: 0, raised: 0 }, weapons: 0, artifacts: 0, unknown: [], realtime: false };
   let s = getState();
   if (result.wishes?.records.length) {
     const { list, added } = mergeWishes(s.wishes, result.wishes.records);
@@ -149,6 +202,11 @@ export function applyImport(result: ImportResult): ImportSummary {
   }
   summary.wishesTotal = s.wishes.length;
   if (result.good) s = applyGood(s, result.good, summary);
+  if (s.wishes.length) {
+    const synced = syncCharactersFromWishes(s);
+    s = synced.state;
+    summary.fromWishes = { added: synced.added, raised: synced.raised };
+  }
   if (result.account) s = { ...s, account: { ...s.account, ...result.account } };
   if (result.realtime) s = applyRealtime(s, result.realtime, summary);
   setState(s);

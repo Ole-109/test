@@ -80,6 +80,10 @@ export function withProgress(a: AnimeEntry, progress: number, now = Date.now()):
   if (a.episodes && p >= a.episodes && a.status !== 'completed') {
     next.status = 'completed';
     next.completedAt = now;
+  } else if (a.status === 'completed' && a.episodes && p < a.episodes) {
+    // Undoing the last episode re-opens the show.
+    next.status = 'watching';
+    next.completedAt = undefined;
   }
   return next;
 }

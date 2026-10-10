@@ -117,4 +117,27 @@ export function analyzePool(
   };
 }
 
+export interface CharacterCopies {
+  id: string;
+  copies: number;
+  first: string;
+  last: string;
+}
+
+/** Copies of each character in the wish history (all banners), keyed by character id. */
+export function characterCopies(records: WishRecord[]): Map<string, CharacterCopies> {
+  const out = new Map<string, CharacterCopies>();
+  for (const r of sortRecords(records)) {
+    if (r.itemType !== 'character') continue;
+    const c = findCharacter(r.name);
+    if (!c) continue;
+    const e = out.get(c.id);
+    if (e) {
+      e.copies++;
+      e.last = r.time;
+    } else out.set(c.id, { id: c.id, copies: 1, first: r.time, last: r.time });
+  }
+  return out;
+}
+
 export const BANNER_POOLS: BannerKey[] = ['character', 'weapon', 'standard', 'chronicled'];

@@ -87,7 +87,8 @@ const byId = new Map(BASE_CHARACTERS.map((c) => [c.id, c]));
 
 export function findCharacter(name: string): CharacterDef | undefined {
   const k = looseKey(name);
-  if (k.startsWith('traveler') || k === 'aether' || k === 'lumine') return byId.get('traveler');
+  // "TravelerAnemo" (GOOD) etc. – but not the weapon "Traveler's Handy Sword".
+  if (/^traveler(anemo|geo|electro|dendro|hydro|pyro|cryo)?$/.test(k) || k === 'aether' || k === 'lumine') return byId.get('traveler');
   return charByKey.get(k) ?? byId.get(ALIASES[k] ?? '');
 }
 

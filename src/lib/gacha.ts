@@ -97,3 +97,57 @@ export function worstCase(banner: BannerKey, pity: number, guaranteed: boolean, 
 export function totalPulls(primogems: number, fates: number, starglitter: number): number {
   return Math.floor(primogems / PRIMOS_PER_PULL) + fates + Math.floor(starglitter / STARGLITTER_PER_PULL);
 }
+
+/** Mean and standard deviation of the pity at which a 5★ drops (no carried-over pity). */
+export function pityMoments(rules: BannerRules): { mean: number; sd: number } {
+  let survive = 1;
+  let mean = 0;
+  let sq = 0;
+  for (let n = 1; n <= rules.hard; n++) {
+    const p = survive * fiveStarRate(rules, n);
+    mean += n * p;
+    sq += n * n * p;
+    survive *= 1 - fiveStarRate(rules, n);
+  }
+  return { mean, sd: Math.sqrt(Math.max(0, sq - mean * mean)) };
+}
+
+/** Standard normal CDF (Abramowitz–Stegun 7.1.26, error < 1e-7). */
+export function normalCdf(z: number): number {
+  const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
+  return z >= 0 ? (1 + y) / 2 : (1 - y) / 2;
+}
+
+/**
+ * Share of players (0–1) who would have had a *worse* average 5★ pity than yours
+ * over the same number of 5★s. 0.8 means "luckier than 80% of players".
+ */
+export function pityLuck(avgPity: number, count: number, rules: BannerRules): number {
+  if (count <= 0) return 0.5;
+  const { mean, sd } = pityMoments(rules);
+  const z = (avgPity - mean) / (sd / Math.sqrt(count));
+  return 1 - normalCdf(z);
+}
+
+/** Share of players (0–1) who won fewer 50/50s than you (exact binomial, ties split). */
+export function fiftyLuck(won: number, total: number, rate = 0.5): number {
+  if (total <= 0) return 0.5;
+  let below = 0;
+  let pk = Math.pow(1 - rate, total); // P(X = 0)
+  for (let k = 0; k <= total; k++) {
+    if (k < won) below += pk;
+    else if (k === won) below += pk / 2;
+    pk = (pk * (total - k) * rate) / ((k + 1) * (1 - rate));
+  }
+  return Math.min(1, Math.max(0, below));
+}
+
+export const WELKIN_DAILY = 90;
+const DAYS_PER_MONTH = 365.25 / 12;
+
+/** Primogems earned over `days`: daily income (+ Welkin) and a monthly lump (Abyss, Theater, events…). */
+export function projectedPrimogems(days: number, income: { daily: number; welkin: boolean; monthly: number }): number {
+  if (days <= 0) return 0;
+  return Math.floor(days * (income.daily + (income.welkin ? WELKIN_DAILY : 0)) + (days / DAYS_PER_MONTH) * income.monthly);
+}

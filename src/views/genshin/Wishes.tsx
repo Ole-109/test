@@ -1,11 +1,12 @@
 import { ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Button, Empty, IconButton, PageHeader } from '../../components/ui';
+import { Columns } from '../../components/charts';
+import { Button, Empty, IconButton, PageHeader, Segmented } from '../../components/ui';
 import { ItemIcon } from '../../components/visuals';
 import { findCharacter, findWeapon, localName } from '../../data/characters';
 import { useT, type T } from '../../i18n';
 import { analyzePool, POOL_OF, sortRecords, type PoolStats, type PulledItem } from '../../core/wishStats';
-import { RULES } from '../../lib/gacha';
+import { fiftyLuck, pityLuck, RULES } from '../../lib/gacha';
 import { setWishOverride } from '../../lib/importActions';
 import { href, navigate } from '../../lib/router';
 import { useStore } from '../../lib/store';
@@ -31,13 +32,12 @@ function shortDate(t: T, time: string) {
   return new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
 }
 
-function BannerSummary({ pool, stats, active, onSelect }: { pool: BannerKey; stats: PoolStats; active: boolean; onSelect: () => void }) {
+function BannerSummary({ pool, active, onSelect }: { pool: BannerKey; active: boolean; onSelect: () => void }) {
   const t = useT();
   const manual = useStore((s) => s.banners[pool]);
   const rules = RULES[pool];
-  const pity5 = stats.total ? stats.pity5 : manual.pity5;
-  const pity4 = stats.total ? stats.pity4 : manual.pity4;
-  const total = stats.total || manual.total;
+  // Imports write the derived counters into the banner state, and manual +1/+10 add on top.
+  const { pity5, pity4, total } = manual;
   const soft = pity5 + 1 >= rules.softStart;
   return (
     <button type="button" className={`banner-sum ${active ? 'is-active' : ''}`} onClick={onSelect} aria-pressed={active}>
@@ -58,7 +58,7 @@ function BannerSummary({ pool, stats, active, onSelect }: { pool: BannerKey; sta
       </div>
       <span className="muted small">
         {pool === 'character' || pool === 'chronicled'
-          ? (stats.total ? stats.guaranteed : manual.guaranteed)
+          ? manual.guaranteed
             ? t('wish.guaranteed')
             : t('wish.fiftyFifty')
           : pool === 'weapon'
@@ -128,6 +128,11 @@ function StatsTable({ stats }: { stats: PoolStats }) {
     [t('wish.avgPity') + ' 4★', stats.four.length ? t.num(Math.round(stats.avgPity4 * 10) / 10) : '—'],
   ];
   if (stats.pool === 'character') rows.push([t('wish.winRate'), `${stats.fiftyWon} / ${stats.fiftyWon + stats.fiftyLost}`, stats.fiftyWon + stats.fiftyLost ? pct(stats.fiftyWon / (stats.fiftyWon + stats.fiftyLost), t.lang) : undefined]);
+  // Luck: how this compares with every other player who got the same number of 5★s.
+  const rules = RULES[stats.pool === 'beginner' ? 'standard' : stats.pool];
+  if (stats.five.length) rows.push([t('wish.luckPity'), t('wish.luckValue', { p: pct(pityLuck(stats.avgPity5, stats.five.length, rules), t.lang) })]);
+  const fifty = stats.fiftyWon + stats.fiftyLost;
+  if (fifty) rows.push([t('wish.luckFifty'), t('wish.luckValue', { p: pct(fiftyLuck(stats.fiftyWon, fifty), t.lang) })]);
   return (
     <table className="kv">
       <tbody>
@@ -165,6 +170,73 @@ function FourSummary({ stats }: { stats: PoolStats }) {
         );
       })}
     </div>
+  );
+}
+
+function WishCharts({ records, stats, pool }: { records: WishRecord[]; stats: PoolStats; pool: BannerKey }) {
+  const t = useT();
+  const [view, setView] = useState<'pity' | 'month'>('pity');
+  const hard = RULES[pool].hard;
+  const monthFmt = useMemo(() => new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { month: 'short' }), [t.lang]);
+
+  const pityBins = useMemo(() => {
+    const bins = Array.from({ length: Math.ceil(hard / 10) }, (_, i) => ({
+      key: String(i),
+      label: `${i * 10 + 1}–${Math.min(hard, i * 10 + 10)}`,
+      value: 0,
+    }));
+    for (const f of stats.five) bins[Math.min(bins.length - 1, Math.floor((f.pity - 1) / 10))].value++;
+    return bins;
+  }, [stats, hard]);
+
+  const months = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of records) if (POOL_OF[r.gachaType] === pool) counts.set(r.time.slice(0, 7), (counts.get(r.time.slice(0, 7)) ?? 0) + 1);
+    const keys = [...counts.keys()].sort();
+    if (!keys.length) return [];
+    // Continuous range (empty months show as gaps), at most the last 24 months.
+    const out: { key: string; label: string; value: number }[] = [];
+    let [y, m] = keys[0].split('-').map(Number);
+    const [ly, lm] = keys[keys.length - 1].split('-').map(Number);
+    while (y < ly || (y === ly && m <= lm)) {
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+      out.push({ key, label: m === 1 ? String(y) : monthFmt.format(new Date(y, m - 1, 1)), value: counts.get(key) ?? 0 });
+      if (++m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+    return out.slice(-24);
+  }, [records, pool, monthFmt]);
+
+  return (
+    <section className="card" aria-labelledby="charts-h">
+      <div className="card-head">
+        <h2 id="charts-h" className="card-title">
+          {view === 'pity' ? t('wish.pityDist') : t('wish.perMonth')}
+        </h2>
+        <Segmented
+          size="sm"
+          label={t('wish.charts')}
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'pity', label: t('wish.pityDistShort') },
+            { value: 'month', label: t('wish.perMonthShort') },
+          ]}
+        />
+      </div>
+      {view === 'pity' ? (
+        <Columns data={pityBins} label={t('wish.pityDist')} tip={(d) => t('wish.chartTip', { label: d.label, n: d.value })} />
+      ) : (
+        <Columns
+          data={months}
+          label={t('wish.perMonth')}
+          labelEvery={months.length > 12 ? 3 : 1}
+          tip={(d) => t('wish.chartTip', { label: d.key, n: t.num(d.value) })}
+        />
+      )}
+    </section>
   );
 }
 
@@ -312,7 +384,7 @@ export function Wishes() {
 
       <div className="banner-sums">
         {BANNERS.map((b) => (
-          <BannerSummary key={b} pool={b} stats={stats[b]} active={pool === b} onSelect={() => setPool(b)} />
+          <BannerSummary key={b} pool={b} active={pool === b} onSelect={() => setPool(b)} />
         ))}
       </div>
 
@@ -356,6 +428,7 @@ export function Wishes() {
               )}
             </div>
           </div>
+          <WishCharts records={wishes} stats={st} pool={pool} />
           <PullLog records={wishes} pool={pool} />
           <details className="card manual-details">
             <summary className="card-title">{t('wish.manual')}</summary>

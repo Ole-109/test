@@ -123,6 +123,7 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
               options={[0, 1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: `C${n}` }))}
               className="seg-fill"
             />
+            {o.wishCopies != null && <p className="field-hint">{t('chars.wishCopies', { n: o.wishCopies })}</p>}
           </Field>
 
           <Field label={t('chars.talents')}>

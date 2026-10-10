@@ -37,7 +37,18 @@ export function defaultState(): AppState {
       standard: emptyBanner(),
       chronicled: emptyBanner(),
     },
-    plan: { primogems: 0, fates: 0, starglitter: 0, banner: 'character', copies: 1, rate: 0.5 },
+    plan: {
+      primogems: 0,
+      fates: 0,
+      starglitter: 0,
+      banner: 'character',
+      copies: 1,
+      rate: 0.5,
+      targetDate: '',
+      dailyPrimos: 60,
+      welkin: false,
+      monthlyPrimos: 1600,
+    },
     anime: [],
     wishes: [],
     wishMeta: { overrides: {} },
@@ -89,16 +100,31 @@ function load(): AppState {
 let state: AppState = load();
 const listeners = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let saveFailed = false;
+const persistErrorListeners = new Set<() => void>();
+
+/** Called once when saving fails (usually: browser storage is full). */
+export function onPersistError(fn: () => void) {
+  persistErrorListeners.add(fn);
+  return () => {
+    persistErrorListeners.delete(fn);
+  };
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    saveFailed = false;
+  } catch {
+    // Keep working in memory, but tell the user once so they can export a backup.
+    if (!saveFailed) persistErrorListeners.forEach((l) => l());
+    saveFailed = true;
+  }
+}
 
 function persist() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* storage full or unavailable – keep working in memory */
-    }
-  }, 150);
+  saveTimer = setTimeout(save, 150);
 }
 
 export function getState(): AppState {
@@ -129,11 +155,7 @@ if (typeof window !== 'undefined') {
   });
   window.addEventListener('beforeunload', () => {
     clearTimeout(saveTimer);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* ignore */
-    }
+    save();
   });
 }
 

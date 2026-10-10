@@ -64,6 +64,8 @@ export interface WishMeta {
   source?: string;
   /** Manual corrections of the 50/50 result, keyed by record id. */
   overrides: Record<string, 'won' | 'lost'>;
+  /** Number of wish records last applied to the character roster. */
+  charSync?: number;
 }
 
 export type ArtifactSlot = 'flower' | 'plume' | 'sands' | 'goblet' | 'circlet';
@@ -117,6 +119,10 @@ export interface OwnedCharacter {
   artifacts: string;
   /** Ascension phase 0–6 (from imports). */
   ascension?: number;
+  /** Copies found in the imported wish history. */
+  wishCopies?: number;
+  /** false while the entry only comes from wish history (level/talents unknown). */
+  detailsKnown?: boolean;
   build: BuildStatus;
   favorite: boolean;
   notes: string;
@@ -168,6 +174,11 @@ export interface WishPlan {
   copies: number;
   /** Featured win rate for the character banner (0.5 or 0.55 with Capturing Radiance). */
   rate: number;
+  /** Savings forecast: target date (YYYY-MM-DD, empty = off) and income. */
+  targetDate: string;
+  dailyPrimos: number;
+  welkin: boolean;
+  monthlyPrimos: number;
 }
 
 export type AnimeStatus = 'watching' | 'planning' | 'completed' | 'paused' | 'dropped';

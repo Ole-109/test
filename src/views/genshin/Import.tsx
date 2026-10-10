@@ -69,6 +69,9 @@ function Summary({ s, label }: { s: ImportSummary; label: string }) {
         <ul>
           {s.hadWishes && <li>{t('import.wishesAdded', { n: t.num(s.wishesAdded), total: t.num(s.wishesTotal) })}</li>}
           {s.characters > 0 && <li>{t('import.charsUpdated', { n: s.characters })}</li>}
+          {(s.fromWishes.added > 0 || s.fromWishes.raised > 0) && (
+            <li>{t('import.charsFromWishes', { added: s.fromWishes.added, raised: s.fromWishes.raised })}</li>
+          )}
           {(s.weapons > 0 || s.artifacts > 0) && <li>{t('import.gear', { w: s.weapons, a: s.artifacts })}</li>}
           {s.realtime && <li>{t('import.realtime')}</li>}
           {s.unknown.length > 0 && <li className="muted">{t('import.unknown', { list: s.unknown.join(', ') })}</li>}

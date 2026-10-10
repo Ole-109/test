@@ -195,7 +195,7 @@ var ALIASES = {
 var byId = new Map(BASE_CHARACTERS.map((c2) => [c2.id, c2]));
 function findCharacter(name) {
   const k = looseKey(name);
-  if (k.startsWith("traveler") || k === "aether" || k === "lumine") return byId.get("traveler");
+  if (/^traveler(anemo|geo|electro|dendro|hydro|pyro|cryo)?$/.test(k) || k === "aether" || k === "lumine") return byId.get("traveler");
   return charByKey.get(k) ?? byId.get(ALIASES[k] ?? "");
 }
 var weaponByKey = /* @__PURE__ */ new Map();
@@ -244,9 +244,10 @@ var GACHA_TYPES = /* @__PURE__ */ new Set(["100", "200", "301", "400", "302", "5
 function itemKind(name, itemType, itemId) {
   if (itemId && /^1\d{7}$/.test(itemId)) return "character";
   if (itemId && /^\d{5}$/.test(itemId)) return "weapon";
+  if (/weapon|waffe|arme|arma|武器|무기/i.test(itemType ?? "")) return "weapon";
+  if (/character|figur|personnage|personaje|角色|캐릭터/i.test(itemType ?? "")) return "character";
   if (findCharacter(name)) return "character";
-  if (findWeapon(name)) return "weapon";
-  return /weapon|waffe|arme|arma|武器|무기/i.test(itemType ?? "") ? "weapon" : "character";
+  return findWeapon(name) ? "weapon" : "character";
 }
 function rankOf(name, kind, rank) {
   const n = Number(rank);
@@ -352,6 +353,9 @@ function parseImport(text) {
     throw new ImportError("This file is not valid JSON.");
   }
   if (!json || typeof json !== "object") throw new ImportError("Unrecognised file.");
+  if (json.app === "waypoint" && json.data) {
+    throw new ImportError("This is a Waypoint backup. Restore it under Settings \u2192 Import backup.");
+  }
   if (json.format === "waypoint-export") {
     const b = json;
     const wishes = b.uigf ? parseUigf(b.uigf).wishes : void 0;
@@ -509,14 +513,17 @@ var SLOT = {
   EQUIP_RING: "goblet",
   EQUIP_DRESS: "circlet"
 };
-async function fetchEnka(http, uid) {
-  const data = await http.json(`https://enka.network/api/uid/${encodeURIComponent(uid)}/`);
+async function fetchSkillOrder(http) {
   const store = await http.json(
     "https://raw.githubusercontent.com/EnkaNetwork/API-docs/master/store/characters.json"
   );
   const skillOrder = {};
   for (const [id, c2] of Object.entries(store)) if (c2.SkillOrder) skillOrder[id] = c2.SkillOrder;
-  return { data, skillOrder };
+  return skillOrder;
+}
+async function fetchEnka(http, uid) {
+  const data = await http.json(`https://enka.network/api/uid/${encodeURIComponent(uid)}/`);
+  return { data, skillOrder: await fetchSkillOrder(http) };
 }
 function enkaToGood(res, skillOrder) {
   const characters = [];
@@ -674,21 +681,46 @@ var Hoyolab = class {
 };
 var POS = { 1: "flower", 2: "plume", 3: "sands", 4: "goblet", 5: "circlet" };
 var num = (v) => parseFloat(v.replace("%", ""));
-function hoyolabToGood(list) {
+function baseTalents(c2, order) {
+  const skills = c2.skills ?? [];
+  const active = skills.filter((s) => s.skill_type === 1);
+  const byId2 = (id) => id == null ? void 0 : skills.find((s) => s.skill_id === id);
+  const picked = order && order.length >= 3 && order.every((id) => byId2(id)) ? { auto: byId2(order[0]), skill: byId2(order[1]), burst: byId2(order[2]) } : { auto: active[0], skill: active[1], burst: active[active.length - 1] };
+  const boosted = /* @__PURE__ */ new Set();
+  const known = (c2.constellations ?? []).length > 0;
+  for (const con of c2.constellations ?? []) {
+    if (!con.is_actived) continue;
+    const text = con.effect.replace(/<[^>]+>/g, "");
+    if (!/by\s*3\b/i.test(text)) continue;
+    for (const t of ["auto", "skill", "burst"]) {
+      const name = picked[t]?.name;
+      if (name && text.includes(name)) boosted.add(t);
+    }
+    const generic = text.match(/(Normal Attack|Elemental Skill|Elemental Burst)[^.]*?by\s*3/i)?.[1].toLowerCase();
+    if (generic) boosted.add(generic === "normal attack" ? "auto" : generic === "elemental skill" ? "skill" : "burst");
+  }
+  const base = (t) => {
+    const level = picked[t]?.level ?? 1;
+    if (known) return Math.max(1, level - (boosted.has(t) ? 3 : 0));
+    return level > 10 ? level - 3 : level;
+  };
+  const out = { auto: base("auto"), skill: base("skill"), burst: base("burst") };
+  if (findCharacter(c2.base.name)?.id === "tartaglia" && out.auto > 1) out.auto -= 1;
+  return out;
+}
+function hoyolabToGood(list, skillOrder = {}) {
   const characters = [];
   const weapons = [];
   const artifacts = [];
   for (const c2 of list) {
     const def = findCharacter(c2.base.name);
     const key = toGoodKey(def?.name ?? c2.base.name);
-    const active = (c2.skills ?? []).filter((s) => s.skill_type === 1);
-    const base = (l) => l == null ? 1 : l > 10 ? l - 3 : l;
     characters.push({
       key,
       level: c2.base.level,
       ascension: ascensionForLevel(c2.base.level),
       constellation: c2.base.actived_constellation_num,
-      talent: { auto: base(active[0]?.level), skill: base(active[1]?.level), burst: base(active[active.length - 1]?.level) }
+      talent: baseTalents(c2, skillOrder[String(c2.base.id)])
     });
     if (c2.weapon) {
       weapons.push({
@@ -964,7 +996,8 @@ ${link}
       step(`Reading Battle Chronicle for UID ${uid}\u2026`);
       account = { ...account, ...accountFromIndex(uid, await hl.index(uid)) };
       const chars = await hl.characters(uid);
-      good = hoyolabToGood(chars);
+      const skillOrder = await fetchSkillOrder(http).catch(() => ({}));
+      good = hoyolabToGood(chars, skillOrder);
       ok(`${good.characters?.length} characters, ${good.weapons?.length} equipped weapons, ${good.artifacts?.length} equipped artifacts`);
       try {
         realtime = dailyNoteToRealtime(await hl.dailyNote(uid));
