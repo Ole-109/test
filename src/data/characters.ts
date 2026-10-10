@@ -136,6 +136,20 @@ export const STANDARD_FIVE_STARS: Record<string, number> = {
   'yumemizuki-mizuki': Date.UTC(2025, 2, 5),
 };
 
+/** The permanent 5★ weapons of the standard banner (what a lost weapon 50/50 gives). */
+export const STANDARD_FIVE_STAR_WEAPONS = new Set([
+  'Aquila Favonia',
+  'Skyward Blade',
+  "Wolf's Gravestone",
+  'Skyward Pride',
+  'Primordial Jade Winged-Spear',
+  'Skyward Spine',
+  'Lost Prayer to the Sacred Winds',
+  'Skyward Atlas',
+  "Amos' Bow",
+  'Skyward Harp',
+]);
+
 export const ELEMENTS: Element[] = ['pyro', 'hydro', 'anemo', 'electro', 'dendro', 'cryo', 'geo'];
 export const WEAPONS: Weapon[] = ['sword', 'claymore', 'polearm', 'bow', 'catalyst'];
 export const REGIONS: Region[] = [

@@ -269,6 +269,10 @@ function partsOf(r) {
   return parts;
 }
 var ImportError = class extends Error {
+  constructor(message, code = "unknown") {
+    super(message);
+    this.code = code;
+  }
 };
 var GACHA_TYPES = /* @__PURE__ */ new Set(["100", "200", "301", "400", "302", "500"]);
 function itemKind(name, itemType, itemId) {
@@ -286,16 +290,30 @@ function rankOf(name, kind, rank) {
   const r = findWeapon(name)?.rarity ?? 3;
   return r >= 5 ? 5 : r === 4 ? 4 : 3;
 }
+function itemById(itemId) {
+  if (!itemId) return void 0;
+  if (/^1\d{7}$/.test(itemId)) {
+    const c2 = characterByAvatarId(Number(itemId));
+    return c2 && { name: c2.name, kind: "character" };
+  }
+  if (/^\d{5}$/.test(itemId)) {
+    const w = findWeapon(Number(itemId));
+    return w && { name: w.name, kind: "weapon" };
+  }
+  return void 0;
+}
 function fromUigfItem(i) {
   const type = String(i.gacha_type ?? i.uigf_gacha_type);
-  if (!GACHA_TYPES.has(type) || !i.name || !i.time) return null;
-  const itemType = itemKind(i.name, i.item_type, i.item_id);
+  const known = itemById(i.item_id);
+  const name = known?.name ?? i.name;
+  if (!GACHA_TYPES.has(type) || !name || !i.time) return null;
+  const itemType = known?.kind ?? itemKind(name, i.item_type, i.item_id);
   return {
     id: String(i.id),
     gachaType: type,
-    name: i.name,
+    name,
     itemType,
-    rank: rankOf(i.name, itemType, i.rank_type),
+    rank: rankOf(name, itemType, i.rank_type),
     time: i.time,
     itemId: i.item_id || void 0
   };
@@ -303,7 +321,7 @@ function fromUigfItem(i) {
 function parseUigf(json) {
   if (Array.isArray(json.hk4e)) {
     const accounts = json.hk4e;
-    if (!accounts.length) throw new ImportError("This UIGF file contains no Genshin Impact accounts.");
+    if (!accounts.length) throw new ImportError("This UIGF file contains no Genshin Impact accounts.", "uigfEmpty");
     const acc = [...accounts].sort((a, b) => (b.list?.length ?? 0) - (a.list?.length ?? 0))[0];
     const records2 = (acc.list ?? []).map(fromUigfItem).filter((r) => !!r);
     return { kind: "uigf", label: "UIGF v4", wishes: { records: records2, uid: String(acc.uid) } };
@@ -355,8 +373,8 @@ var PAIMON_SERVER = { Asia: "asia", China: "asia", America: "america", Europe: "
 var isPaimonKey = (k) => /^(account\d+-)?(wish-counter-|achievement$|characters$|wish-uid$)/.test(k);
 function paimonWishes(json, prefix) {
   const records = [];
-  let seq = 0;
   for (const [key, type] of Object.entries(PAIMON_KEYS)) {
+    const sameSecond = /* @__PURE__ */ new Map();
     const pulls = json[prefix + key]?.pulls ?? [];
     for (const p of pulls) {
       if (!p?.id || !p.time) continue;
@@ -365,8 +383,10 @@ function paimonWishes(json, prefix) {
       const def = kind === "character" ? findCharacter(name) : findWeapon(name);
       const code = p.code && GACHA_TYPES.has(p.code) ? p.code : type;
       const ts = String(recordTime(p.time)).padStart(13, "0");
+      const n = sameSecond.get(ts) ?? 0;
+      sameSecond.set(ts, n + 1);
       records.push({
-        id: `p${ts}${String(seq++).padStart(6, "0")}`,
+        id: `p${ts}${type}${String(n).padStart(3, "0")}`,
         gachaType: code,
         name: def?.name ?? name.replace(/\b\w/g, (c2) => c2.toUpperCase()),
         itemType: kind,
@@ -410,7 +430,7 @@ function parsePaimon(json) {
     { key: "main", label: "Main", result: paimonAccount(json, "") },
     ...extra.map((a) => ({ key: a, label: `Account ${a.replace(/^account/, "")}`, result: paimonAccount(json, `${a}-`) }))
   ].filter((a) => partsOf(a.result).some((p) => p !== "profile")).map((a) => ({ ...a, result: { ...a.result, savedAt } }));
-  if (!accounts.length) throw new ImportError("This paimon.moe backup contains no wishes, achievements or characters.");
+  if (!accounts.length) throw new ImportError("This paimon.moe backup contains no wishes, achievements or characters.", "paimonEmpty");
   return { ...accounts[0].result, accounts: accounts.length > 1 ? accounts : void 0 };
 }
 function parseImport(text) {
@@ -418,11 +438,11 @@ function parseImport(text) {
   try {
     json = JSON.parse(text.replace(/^﻿/, ""));
   } catch {
-    throw new ImportError("This file is not valid JSON.");
+    throw new ImportError("This file is not valid JSON.", "notJson");
   }
   if (!json || typeof json !== "object") throw new ImportError("Unrecognised file.");
   if (json.app === "waypoint" && json.data || "settings" in json && "tasks" in json) {
-    throw new ImportError("This is a Waypoint backup. Restore it under Settings \u2192 Import backup.");
+    throw new ImportError("This is a Waypoint backup. Restore it under Settings \u2192 Import backup.", "waypointBackup");
   }
   if (json.format === "waypoint-export") {
     const b = json;
@@ -442,7 +462,7 @@ function parseImport(text) {
 var isSynthetic = (r) => r.id.startsWith("p");
 var dedupeKey = (r) => `${POOL_OF[r.gachaType]}|${r.time}|${r.name.toLowerCase()}`;
 function mergeWishes(existing, incoming) {
-  const ids = new Set(existing.map((r) => r.id));
+  const byId2 = new Map(existing.map((r) => [r.id, r]));
   const byKey = /* @__PURE__ */ new Map();
   for (const r of existing) {
     const k = dedupeKey(r);
@@ -450,20 +470,26 @@ function mergeWishes(existing, incoming) {
   }
   const consumed = /* @__PURE__ */ new Set();
   const replaced = /* @__PURE__ */ new Set();
+  const remap = /* @__PURE__ */ new Map();
   const added = [];
   for (const r of incoming) {
-    if (ids.has(r.id)) continue;
-    const twin = (byKey.get(dedupeKey(r)) ?? []).find((c2) => isSynthetic(c2) !== isSynthetic(r) && !consumed.has(c2));
+    const same = byId2.get(r.id);
+    if (same) {
+      consumed.add(same);
+      continue;
+    }
+    const twin = (byKey.get(dedupeKey(r)) ?? []).find((c2) => !consumed.has(c2) && (isSynthetic(c2) || isSynthetic(r)));
     if (twin) {
       consumed.add(twin);
-      if (isSynthetic(r)) continue;
+      if (isSynthetic(r) || !isSynthetic(twin)) continue;
       replaced.add(twin);
+      remap.set(twin.id, r.id);
     }
     added.push(r);
-    ids.add(r.id);
+    byId2.set(r.id, r);
   }
   const list = sortRecords([...existing.filter((r) => !replaced.has(r)), ...added]);
-  return { list, added: added.length - replaced.size };
+  return { list, added: added.length - replaced.size, remap };
 }
 
 // tools/cli/cache.ts

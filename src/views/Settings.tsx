@@ -5,7 +5,7 @@ import { Button, Field, Kbd, PageHeader, Segmented, Stepper, Switch, TextInput }
 import { BASE_CHARACTERS, GAME_DATA_UPDATED } from '../data/characters';
 import { useT } from '../i18n';
 import { restore, setSetting, snapshot } from '../lib/actions';
-import { defaultState, hydrate, setState, useStore } from '../lib/store';
+import { defaultState, hydrate, isWaypointBackup, setState, useStore } from '../lib/store';
 import type { Lang, Server, ThemePref, TitleLang } from '../lib/types';
 
 export function Settings() {
@@ -28,10 +28,17 @@ export function Settings() {
   const importData = async (file: File) => {
     try {
       const json = JSON.parse(await file.text());
-      const data = json?.app === 'waypoint' ? json.data : json;
-      if (!data || typeof data !== 'object' || !('settings' in data || 'anime' in data || 'banners' in data)) throw new Error('shape');
+      // Only real Waypoint backups: anything else would silently reset what the file lacks.
+      if (!isWaypointBackup(json)) throw new Error('shape');
+      const next = hydrate('app' in json && json.app === 'waypoint' ? json.data : json);
+      const summary = t('settings.restoreConfirm', {
+        anime: next.anime.length,
+        wishes: next.wishes.length,
+        chars: Object.keys(next.characters).length,
+      });
+      if (!window.confirm(summary)) return;
       const prev = snapshot();
-      setState(hydrate(data));
+      setState(next);
       toast({ message: t('settings.imported'), tone: 'success', action: { label: t('common.undo'), run: () => restore(prev) } });
     } catch {
       toast({ message: t('settings.importFailed'), tone: 'error' });
@@ -101,7 +108,10 @@ export function Settings() {
             onChange={(e) => setSetting('proxyUrl', e.target.value.trim())}
           />
         </Field>
-        <p className="muted small">{t('settings.gameData', { date: GAME_DATA_UPDATED, n: BASE_CHARACTERS.length })}</p>
+        <p className="muted small">{t('settings.gameData', {
+            date: new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'long' }).format(new Date(GAME_DATA_UPDATED)),
+            n: BASE_CHARACTERS.length,
+          })}</p>
       </section>
 
       <section className="card settings-section" aria-labelledby="set-anime">

@@ -1,5 +1,5 @@
 import { setStepsDone, type Achievement } from '../core/achievements';
-import { withProgress, withStatus } from './anime';
+import { withProgress, withStatus, withSynced } from './anime';
 import { resinAt, setResin } from './resin';
 import { findCharacter } from '../data/characters';
 import { getState, setState, uid, update } from './store';
@@ -15,11 +15,30 @@ import type {
   Task,
 } from './types';
 
-/** Snapshot to restore with `restore()` for undo. */
+/** Puts `item` back at `index` unless an entry with its id is already there (targeted undo). */
+export function reinsert<T extends { id: string }>(list: T[], item: T, index: number): T[] {
+  if (list.some((x) => x.id === item.id)) return list;
+  const next = [...list];
+  next.splice(Math.max(0, Math.min(index, next.length)), 0, item);
+  return next;
+}
+
+/**
+ * Whole-state snapshot to restore with `restore()` for undo. Only for bulk
+ * operations (imports, wipes); single deletions undo just themselves so
+ * later changes survive.
+ */
 export const snapshot = () => getState();
 export const restore = (s: AppState) => setState(s);
 
 export function setSetting<K extends keyof Settings>(key: K, value: Settings[K]) {
+  if (key === 'resinCap') {
+    // Pin today's resin under the old cap first, so raising the cap doesn't credit resin
+    // that "regenerated" while it was actually capped.
+    const s = getState();
+    const now = Date.now();
+    update('resin', (r) => setResin(r, s.settings.resinCap, resinAt(r, s.settings.resinCap, now).current, now));
+  }
   update('settings', (s) => ({ ...s, [key]: value }));
 }
 
@@ -80,8 +99,12 @@ export function patchTask(id: string, patch: Partial<Task>) {
   update('tasks', (ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 }
 
-export function removeTask(id: string) {
+/** Removes a task; returns an undo function that puts back only this task. */
+export function removeTask(id: string): () => void {
+  const index = getState().tasks.findIndex((t) => t.id === id);
+  const task = getState().tasks[index];
   update('tasks', (ts) => ts.filter((t) => t.id !== id));
+  return () => task && update('tasks', (ts) => reinsert(ts, task, index));
 }
 
 // ── Characters ───────────────────────────────────────────────────────────
@@ -100,6 +123,32 @@ export const newOwned = (): OwnedCharacter => ({
   updatedAt: Date.now(),
 });
 
+/** Un-owns a character (and drops it from the farming plan); returns an undo for just that. */
+export function removeOwned(id: string): () => void {
+  const s = getState();
+  const entry = s.characters[id];
+  const fi = s.farming.findIndex((f) => f.id === id);
+  const target = s.farming[fi];
+  setOwned(id, false);
+  return () => {
+    if (entry) update('characters', (cs) => (cs[id] ? cs : { ...cs, [id]: entry }));
+    if (target) update('farming', (list) => reinsert(list, target, fi));
+  };
+}
+
+/** Deletes a custom character; returns an undo for just that. */
+export function removeCustomCharacter(id: string): () => void {
+  const s = getState();
+  const ci = s.customCharacters.findIndex((x) => x.id === id);
+  const def = s.customCharacters[ci];
+  const undoOwned = removeOwned(id);
+  update('customCharacters', (cs) => cs.filter((x) => x.id !== id));
+  return () => {
+    if (def) update('customCharacters', (cs) => reinsert(cs, def, ci));
+    undoOwned();
+  };
+}
+
 export function setOwned(id: string, owned: boolean) {
   update('characters', (cs) => {
     const next = { ...cs };
@@ -107,6 +156,8 @@ export function setOwned(id: string, owned: boolean) {
     else delete next[id];
     return next;
   });
+  // A character you no longer own can't stay in the farming plan (it would be costed from level 1).
+  if (!owned) update('farming', (list) => list.filter((f) => f.id !== id));
 }
 
 export function patchCharacter(id: string, patch: Partial<OwnedCharacter>) {
@@ -217,15 +268,23 @@ export function setAnimeStatus(id: string, status: AnimeStatus) {
   update('anime', (list) => list.map((a) => (a.id === id ? withStatus(a, status) : a)));
 }
 
-export function removeAnime(id: string) {
+/** Removes a show; returns where it was so it can be put back. */
+export function removeAnime(id: string): number {
+  const index = getState().anime.findIndex((a) => a.id === id);
   update('anime', (list) => list.filter((a) => a.id !== id));
+  return index;
+}
+
+/** Puts a removed show back at its old position (no-op if it is already there). */
+export function restoreAnime(entry: AnimeEntry, index: number) {
+  update('anime', (list) => reinsert(list, entry, index));
 }
 
 export function mergeSynced(patches: Map<number, Partial<AnimeEntry>>) {
   update('anime', (list) =>
     list.map((a) => {
       const p = a.anilistId != null ? patches.get(a.anilistId) : undefined;
-      return p ? { ...a, ...p } : a;
+      return p ? withSynced(a, p) : a;
     }),
   );
 }

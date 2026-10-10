@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useT } from '../i18n';
 
 export interface Toast {
   id: number;
@@ -27,12 +28,23 @@ export function dismiss(id: number) {
 }
 
 function ToastItem({ t }: { t: Toast }) {
+  const tr = useT();
+  // The timer pauses while the pointer or keyboard focus is on the toast, so Undo stays reachable.
+  const [held, setHeld] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => dismiss(t.id), t.duration ?? (t.action ? 6000 : 3500));
+    if (held) return;
+    const timer = setTimeout(() => dismiss(t.id), t.duration ?? (t.action ? 8000 : 3500));
     return () => clearTimeout(timer);
-  }, [t]);
+  }, [t, held]);
   return (
-    <div className={`toast toast-${t.tone ?? 'default'}`} role="status">
+    <div
+      className={`toast toast-${t.tone ?? 'default'}`}
+      role="status"
+      onPointerEnter={() => setHeld(true)}
+      onPointerLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setHeld(false)}
+    >
       <span className="toast-msg">{t.message}</span>
       {t.action && (
         <button
@@ -46,7 +58,7 @@ function ToastItem({ t }: { t: Toast }) {
           {t.action.label}
         </button>
       )}
-      <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => dismiss(t.id)}>
+      <button type="button" className="toast-close" aria-label={tr('common.close')} onClick={() => dismiss(t.id)}>
         <X size={14} />
       </button>
     </div>

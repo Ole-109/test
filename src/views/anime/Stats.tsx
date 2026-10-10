@@ -75,7 +75,7 @@ export function Stats() {
               <span className="muted small">{t('stats.time')}</span>
               <strong>
                 {days >= 1
-                  ? t('stats.days', { n: t.num(days, { maximumFractionDigits: 1 }) })
+                  ? t.n('stats.days', Math.round(days * 10) / 10, { n: t.num(days, { maximumFractionDigits: 1 }) })
                   : t('stats.hours', { n: t.num(s.minutes / 60, { maximumFractionDigits: 1 }) })}
               </strong>
             </div>

@@ -58,6 +58,14 @@ export interface CurrentState {
   talents: [number, number, number];
 }
 
+/** Level caps before each ascension: A1 needs Lv 20, A2 Lv 40, … A6 Lv 80. */
+const ASC_CAPS = [20, 40, 50, 60, 70, 80];
+
+/** Ascension phase a talent level needs. */
+export function ascensionForTalent(talent: number): number {
+  return talent <= 1 ? 0 : talent <= 2 ? 2 : talent <= 4 ? 3 : talent <= 6 ? 4 : talent <= 8 ? 5 : 6;
+}
+
 /** Ascension phase needed to reach `level` (20 → 0, 21–40 → 1, …, 81–90 → 6). */
 export function ascensionForTarget(level: number): number {
   const caps = [20, 40, 50, 60, 70, 80, 90];
@@ -107,8 +115,12 @@ export function requirementFor(characterId: string, current: CurrentState, targe
   const req: Requirement = { items: new Map(), mora: 0, heroWit: 0 };
   const mats = MATS.get(characterId);
   if (!mats) return req;
-  const ascFrom = current.ascension ?? ascensionForLevel(current.level);
-  const ascTo = Math.max(ascFrom, ascensionForTarget(target.level));
+  // A stored ascension can lag behind a level edited by hand; never go below what the level implies.
+  const ascFrom = Math.max(current.ascension ?? 0, ascensionForLevel(current.level));
+  // Talent levels need ascension too (in-game caps: A2 → 2, A3 → 4, A4 → 6, A5 → 8, A6 → 10).
+  const ascTo = Math.max(ascFrom, ascensionForTarget(target.level), ascensionForTalent(Math.max(...target.talents)));
+  // Ascending to phase p means reaching the previous phase's level cap first.
+  const levelTo = Math.max(target.level, ASC_CAPS[ascTo - 1] ?? 1);
   for (let phase = ascFrom; phase < ascTo; phase++) {
     const [items, coin] = mats.asc[phase] ?? [{}, 0];
     add(req.items, items);
@@ -121,7 +133,7 @@ export function requirementFor(characterId: string, current: CurrentState, targe
       req.mora += coin;
     }
   }
-  const wit = Math.max(0, Math.ceil(heroWitTo(target.level) - heroWitTo(current.level)));
+  const wit = Math.max(0, Math.ceil(heroWitTo(levelTo) - heroWitTo(current.level)));
   req.heroWit = wit;
   req.mora += wit * 4000; // 1 Mora per 5 EXP when levelling
   return req;

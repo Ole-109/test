@@ -41,14 +41,15 @@ export interface Occurrence {
 }
 
 /** Airings in [from, to) from AniList data or the manual weekly slot. */
-export function occurrences(a: AnimeEntry, from: number, to: number): Occurrence[] {
+export function occurrences(a: AnimeEntry, from: number, to: number, now = Date.now()): Occurrence[] {
   const out: Occurrence[] = [];
   const next = projectedAiring(a, from);
   if (next) {
     let { at, episode } = next;
-    // Include last week's slot if it falls inside the window (e.g. aired earlier today).
-    // Only one step: a show returning from a break must not get invented airings.
-    if (at - WEEK >= from && episode > 1) {
+    // Include last week's slot if it falls inside the window and has already aired (e.g. earlier
+    // today). Only one step, and never into the future: a show returning from a break would
+    // otherwise get an invented airing in the week it skipped.
+    if (at - WEEK >= from && at - WEEK <= now && episode > 1) {
       at -= WEEK;
       episode -= 1;
     }
@@ -77,7 +78,8 @@ export function withProgress(a: AnimeEntry, progress: number, now = Date.now()):
   const next: AnimeEntry = { ...a, progress: p, updatedAt: now };
   if (p > 0 && (a.status === 'planning' || a.status === 'paused')) next.status = 'watching';
   if (p > 0 && !a.startedAt) next.startedAt = now;
-  if (a.episodes && p >= a.episodes && a.status !== 'completed') {
+  // Only stepping forward finishes a show (−1 on a show whose total was lowered must not complete it).
+  if (a.episodes && p >= a.episodes && p > a.progress && a.status !== 'completed') {
     next.status = 'completed';
     next.completedAt = now;
   } else if (a.status === 'completed' && a.episodes && p < a.episodes) {
@@ -89,14 +91,24 @@ export function withProgress(a: AnimeEntry, progress: number, now = Date.now()):
 }
 
 export function withStatus(a: AnimeEntry, status: AnimeStatus, now = Date.now()): AnimeEntry {
+  // Re-selecting the current status changes nothing (keeps the completion date and sort order).
+  if (status === a.status) return a;
   const next: AnimeEntry = { ...a, status, updatedAt: now };
+  const full = !!a.episodes && a.progress >= a.episodes;
   if (status === 'completed') {
     next.completedAt = now;
     if (a.episodes) next.progress = a.episodes;
-  } else if (a.status === 'completed') {
+  } else {
     next.completedAt = undefined;
-    // "Completed" filled in every episode; moving it back to "Plan to watch" means it wasn't watched.
-    if (status === 'planning') next.progress = 0;
+    if (status === 'planning' && (a.status === 'completed' || full)) {
+      // A planned show hasn't been watched: drop the episodes "Completed" filled in.
+      next.progress = 0;
+      next.startedAt = undefined;
+    } else if (status === 'watching' && a.status === 'completed' && full) {
+      // Watching a finished show again is a rewatch: start from episode 0.
+      next.progress = 0;
+      next.rewatches = a.rewatches + 1;
+    }
   }
   if (status === 'watching' && !a.startedAt) next.startedAt = now;
   return next;
@@ -111,9 +123,24 @@ export const isUntouched = (a: Pick<AnimeEntry, 'status' | 'progress'>) => a.sta
 
 /**
  * Repairs entries saved by older versions: a show moved from "Completed" back
- * to "Plan to watch" kept every episode marked as seen.
+ * to "Plan to watch" (directly or via another status) kept every episode
+ * marked as seen.
  */
 export function repairAnime(a: AnimeEntry): AnimeEntry {
-  if (a.status === 'planning' && a.completedAt) return { ...a, progress: 0, completedAt: undefined };
+  if (a.status === 'planning' && (a.completedAt || (a.episodes && a.progress >= a.episodes)))
+    return { ...a, progress: 0, completedAt: undefined, startedAt: undefined };
   return a;
+}
+
+/**
+ * Applies fresh AniList data to an entry: keeps a total episode count the user
+ * typed when AniList has none, fills in a completed show's episodes once the
+ * total is known, and completes a watched-through show that has finished airing.
+ */
+export function withSynced(a: AnimeEntry, p: Partial<AnimeEntry>, now = Date.now()): AnimeEntry {
+  const next: AnimeEntry = { ...a, ...p, episodes: p.episodes ?? a.episodes };
+  if (next.status === 'completed' && next.episodes && next.progress < next.episodes) next.progress = next.episodes;
+  if (next.status === 'watching' && next.airStatus === 'FINISHED' && next.episodes && next.progress >= next.episodes)
+    return { ...next, status: 'completed', completedAt: now };
+  return next;
 }

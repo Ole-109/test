@@ -6,7 +6,7 @@ import { useT } from '../../i18n';
 import { displayTitle, occurrences, type Occurrence } from '../../lib/anime';
 import { useNow } from '../../lib/hooks';
 import { useStore } from '../../lib/store';
-import { DAY, formatDuration } from '../../lib/time';
+import { formatDuration } from '../../lib/time';
 import { syncAiring } from '../../lib/sync';
 import { AnimeSheet } from './AnimeSheet';
 import { AnimeTabs } from './AnimeTabs';
@@ -29,7 +29,10 @@ export function Schedule() {
 
   const days = useMemo(() => {
     const active = anime.filter((a) => a.status === 'watching' || a.status === 'planning');
-    const all: Occurrence[] = active.flatMap((a) => occurrences(a, from, from + 7 * DAY));
+    // Local midnight a week later (not +7×24h, which is off by an hour in DST-change weeks).
+    const end = new Date(from);
+    end.setDate(end.getDate() + 7);
+    const all: Occurrence[] = active.flatMap((a) => occurrences(a, from, end.getTime(), now));
     // Bucket by real calendar days so DST changes don't shift items.
     return Array.from({ length: 7 }, (_, i) => {
       const date = new Date(from);
@@ -42,7 +45,7 @@ export function Schedule() {
         items: all.filter((o) => o.at >= date.getTime() && o.at < end.getTime()).sort((a, b) => a.at - b.at),
       };
     });
-  }, [anime, from]);
+  }, [anime, from, now]);
 
   const total = days.reduce((s, d) => s + d.items.length, 0);
   const wf = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { weekday: 'long' });

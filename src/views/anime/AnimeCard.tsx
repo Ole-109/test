@@ -67,7 +67,7 @@ export function AnimeCard({
   const title = displayTitle(a, titleLang);
   const behind = behindBy(a, now);
   const next = projectedAiring(a, now);
-  const pct = a.episodes ? (a.progress / a.episodes) * 100 : a.progress > 0 ? 100 : 0;
+  const pct = a.episodes ? Math.min(100, (a.progress / a.episodes) * 100) : a.progress > 0 ? 100 : 0;
   const canStep = !a.episodes || a.progress < a.episodes;
   const showStep = a.status !== 'completed' && canStep;
 

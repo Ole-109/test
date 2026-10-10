@@ -1,5 +1,5 @@
-import { findCharacter, findWeapon } from '../data/characters';
-import { fromGoodKey, setSummary, type GoodData } from '../core/good';
+import { findCharacter, findWeapon, STANDARD_FIVE_STAR_WEAPONS } from '../data/characters';
+import { fromGoodKey, setSummary, type GoodCharacter, type GoodData } from '../core/good';
 import { mergeDone } from '../core/achievements';
 import { mergeWishes, partsOf, type ImportPart, type ImportResult, type Realtime } from '../core/formats';
 import { analyzePool, BANNER_POOLS, characterCopies, POOL_OF } from '../core/wishStats';
@@ -34,8 +34,19 @@ export function recomputeBanners(s: AppState): AppState {
   for (const pool of BANNER_POOLS) {
     if (!s.wishes.some((r) => POOL_OF[r.gachaType] === pool)) continue;
     const st = analyzePool(pool, s.wishes, s.wishMeta.overrides);
+    const newest = st.fiveNewestFirst[0]?.record;
+    // A weapon 5★ newer than the last known one settles the fate point: losing to a
+    // standard weapon earns one, the featured ones reset it (an off-target featured
+    // weapon also earns one – that case can be corrected by hand).
+    const fatePoints =
+      pool === 'weapon' && newest && newest.id !== banners.weapon.history[0]?.id
+        ? STANDARD_FIVE_STAR_WEAPONS.has(findWeapon(newest.name)?.name ?? newest.name)
+          ? 1
+          : 0
+        : banners[pool].fatePoints;
     banners[pool] = {
       ...banners[pool],
+      fatePoints,
       pity5: st.pity5,
       pity4: st.pity4,
       total: st.total,
@@ -57,6 +68,9 @@ function applyGood(s: AppState, good: GoodData, summary: ImportSummary): AppStat
   const now = Date.now();
   const keyToId = new Map<string, string>();
 
+  // Several GOOD keys can map to one character (TravelerAnemo, TravelerPyro, …): keep the most developed.
+  const develop = (gc: GoodCharacter) => (gc.level ?? 0) * 100 + (gc.talent?.auto ?? 0) + (gc.talent?.skill ?? 0) + (gc.talent?.burst ?? 0);
+  const best = new Map<string, GoodCharacter>();
   for (const gc of good.characters ?? []) {
     const def = findCharacter(gc.key) ?? findCharacter(fromGoodKey(gc.key));
     if (!def) {
@@ -64,15 +78,20 @@ function applyGood(s: AppState, good: GoodData, summary: ImportSummary): AppStat
       continue;
     }
     keyToId.set(gc.key, def.id);
-    const prev: OwnedCharacter = characters[def.id] ?? newOwned();
-    characters[def.id] = {
+    const cur = best.get(def.id);
+    if (!cur || develop(gc) > develop(cur)) best.set(def.id, gc);
+  }
+  for (const [id, gc] of best) {
+    const prev: OwnedCharacter = characters[id] ?? newOwned();
+    characters[id] = {
       ...prev,
       level: gc.level || prev.level,
-      ascension: gc.ascension,
+      ascension: gc.ascension ?? prev.ascension,
       // Exact data from the game; still never below what the wish history proves.
       constellation: Math.max(gc.constellation ?? prev.constellation, prev.wishCopies ? Math.min(6, prev.wishCopies - 1) : 0),
       detailsKnown: true,
-      talents: [gc.talent?.auto ?? 1, gc.talent?.skill ?? 1, gc.talent?.burst ?? 1],
+      // Missing talent data keeps what was there instead of resetting to 1.
+      talents: [gc.talent?.auto ?? prev.talents[0], gc.talent?.skill ?? prev.talents[1], gc.talent?.burst ?? prev.talents[2]],
       updatedAt: now,
     };
     summary.characters++;
@@ -108,8 +127,15 @@ function applyGood(s: AppState, good: GoodData, summary: ImportSummary): AppStat
   return {
     ...s,
     characters,
+    // A partial scan (e.g. artifacts only) replaces only the sections it contains.
     inventory: hasInventory
-      ? { weapons, artifacts, materials: good.materials ?? {}, importedAt: now, source: good.source }
+      ? {
+          weapons: good.weapons ? weapons : s.inventory.weapons,
+          artifacts: good.artifacts ? artifacts : s.inventory.artifacts,
+          materials: good.materials ?? s.inventory.materials,
+          importedAt: now,
+          source: good.source,
+        }
       : s.inventory,
   };
 }
@@ -230,12 +256,19 @@ export function applyImport(result: ImportResult, parts: ImportPart[] = partsOf(
   };
   let s = getState();
   if (want.has('wishes') && result.wishes?.records.length) {
-    const { list, added } = mergeWishes(s.wishes, result.wishes.records);
+    const { list, added, remap } = mergeWishes(s.wishes, result.wishes.records);
     summary.wishesAdded = added;
+    // 50/50 corrections follow records that were replaced by real ones.
+    const overrides = { ...s.wishMeta.overrides };
+    for (const [from, to] of remap)
+      if (from in overrides) {
+        overrides[to] = overrides[from];
+        delete overrides[from];
+      }
     s = {
       ...s,
       wishes: list,
-      wishMeta: { ...s.wishMeta, uid: result.wishes.uid ?? s.wishMeta.uid, importedAt: Date.now(), source: result.label },
+      wishMeta: { ...s.wishMeta, overrides, uid: result.wishes.uid ?? s.wishMeta.uid, importedAt: Date.now(), source: result.label },
     };
     s = recomputeBanners(s);
   }
@@ -267,7 +300,18 @@ export function setWishOverride(id: string, outcome: 'won' | 'lost' | null) {
   const overrides = { ...s.wishMeta.overrides };
   if (outcome) overrides[id] = outcome;
   else delete overrides[id];
-  setState(recomputeBanners({ ...s, wishMeta: { ...s.wishMeta, overrides } }));
+  // Only the 50/50 results change: pity and totals stay as they are, so pulls added by hand survive.
+  const next = recomputeBanners({ ...s, wishMeta: { ...s.wishMeta, overrides } });
+  const banners = { ...s.banners };
+  for (const pool of BANNER_POOLS) {
+    const outcome = new Map(next.banners[pool].history.map((h) => [h.id, h.outcome]));
+    banners[pool] = {
+      ...s.banners[pool],
+      guaranteed: pool === 'character' ? next.banners[pool].guaranteed : s.banners[pool].guaranteed,
+      history: s.banners[pool].history.map((h) => (outcome.has(h.id) ? { ...h, outcome: outcome.get(h.id)! } : h)),
+    };
+  }
+  setState({ ...s, banners, wishMeta: { ...s.wishMeta, overrides } });
 }
 
 export function clearWishes() {

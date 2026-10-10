@@ -389,7 +389,7 @@ function ShareButton({ stats }: { stats: Record<BannerKey, PoolStats> }) {
         subtitle: [uid && `UID ${uid}`, account.level && t('home.ar', { n: account.level }), df.format(new Date())].filter(Boolean).join(' · '),
         stats: [
           { label: t('wish.lifetime'), value: t.num(total), sub: t('wish.primosSpent', { n: t.num(total * 160) }) },
-          { label: t('share.fiveStars'), value: t.num(five), sub: c.five.length ? t('wish.avg', { n: t.num(Math.round(c.avgPity5 * 10) / 10) }) : undefined },
+          { label: t('share.fiveStars'), value: t.num(five), sub: c.five.length ? t('share.avgCharacter', { n: t.num(Math.round(c.avgPity5 * 10) / 10) }) : undefined },
           { label: t('wish.winRate'), value: fifty ? `${c.fiftyWon} / ${fifty}` : '—', sub: fifty ? pct(c.fiftyWon / fifty, t.lang) : undefined },
           {
             label: t('wish.luckPity'),

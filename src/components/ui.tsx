@@ -2,6 +2,7 @@ import { Minus, Plus, Star } from 'lucide-react';
 import {
   forwardRef,
   useId,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -136,6 +137,15 @@ export function Stepper({
   size?: 'sm' | 'md';
 }) {
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  // Text being typed: committed as soon as it is a valid number in range, clamped on blur/Enter.
+  // (Clamping every keystroke made "300" impossible to type when the minimum is 60.)
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft == null) return;
+    const n = parseInt(draft, 10);
+    if (!Number.isNaN(n)) onChange(clamp(n));
+    setDraft(null);
+  };
   return (
     <div className={`stepper stepper-${size}`} role="group" aria-label={label}>
       <button type="button" aria-label={`${label} −`} disabled={value <= min} onClick={() => onChange(clamp(value - step))}>
@@ -144,17 +154,23 @@ export function Stepper({
       <input
         inputMode="numeric"
         aria-label={label}
-        value={format ? format(value) : value}
+        value={draft ?? (format ? format(value) : value)}
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => {
-          const n = parseInt(e.target.value.replace(/[^\d]/g, ''), 10);
-          onChange(clamp(Number.isNaN(n) ? min : n));
+          const text = e.target.value.replace(/[^\d]/g, '');
+          setDraft(text);
+          const n = parseInt(text, 10);
+          if (!Number.isNaN(n) && n >= min && n <= max) onChange(n);
         }}
+        onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowUp') {
+          if (e.key === 'Enter') commit();
+          else if (e.key === 'ArrowUp') {
+            setDraft(null);
             e.preventDefault();
             onChange(clamp(value + step));
           } else if (e.key === 'ArrowDown') {
+            setDraft(null);
             e.preventDefault();
             onChange(clamp(value - step));
           }

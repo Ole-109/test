@@ -5,7 +5,7 @@ import { toast } from '../../components/toast';
 import { Button, Field, IconButton, Segmented, Stepper, TextInput } from '../../components/ui';
 import { Cover } from '../../components/visuals';
 import { useT } from '../../i18n';
-import { addAnime, mergeSynced, patchAnime, removeAnime, restore, setAnimeStatus, snapshot } from '../../lib/actions';
+import { addAnime, mergeSynced, patchAnime, removeAnime, restoreAnime, setAnimeStatus } from '../../lib/actions';
 import { fetchByIds, mediaFields } from '../../lib/anilist';
 import { behindBy, displayTitle, projectedAiring, STATUSES } from '../../lib/anime';
 import { useNow } from '../../lib/hooks';
@@ -38,10 +38,10 @@ export function AnimeSheet({ id, onClose }: { id: string; onClose: () => void })
   const df = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' });
 
   const remove = () => {
-    const snap = snapshot();
-    removeAnime(a.id);
+    const index = removeAnime(a.id);
     onClose();
-    toast({ message: t('common.deleted', { name: title }), action: { label: t('common.undo'), run: () => restore(snap) } });
+    // Undo puts back only this show, so later changes (other deletes, ratings, syncs) survive.
+    toast({ message: t('common.deleted', { name: title }), action: { label: t('common.undo'), run: () => restoreAnime(a, index) } });
   };
 
   const sync = async () => {
@@ -129,7 +129,7 @@ export function AnimeSheet({ id, onClose }: { id: string; onClose: () => void })
               <Plus size={18} />
             </IconButton>
           </div>
-          {(next || behind > 0) && (
+          {(a.status === 'watching' || a.status === 'planning') && (next || behind > 0) && (
             <p className="muted small center">
               {behind > 0 && <span className="badge badge-accent">{t.n('anime.behind', behind)}</span>}{' '}
               {next && t('anime.nextEp', { n: next.episode, when: t.when(next.at, now) })}

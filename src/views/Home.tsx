@@ -126,7 +126,11 @@ function RoutineCard({ now }: { now: number }) {
 function PityCard() {
   const t = useT();
   const banners = useStore((s) => s.banners);
-  const last = banners.character.history[0] ?? banners.weapon.history[0];
+  // The newest 5★ across all banners.
+  const last = Object.values(banners)
+    .map((b) => b.history[0])
+    .filter((h) => !!h)
+    .sort((a, b) => b.at - a.at)[0];
   const keys = ['character', 'weapon', 'standard'] as const;
   return (
     <section className="card pity-mini" aria-labelledby="home-pity">
@@ -252,7 +256,7 @@ function AiringCard({ now }: { now: number }) {
     () =>
       anime
         .filter((a) => a.status === 'watching' || a.status === 'planning')
-        .flatMap((a) => occurrences(a, now - 30 * 60_000, now + DAY))
+        .flatMap((a) => occurrences(a, now - 30 * 60_000, now + DAY, now))
         .sort((a, b) => a.at - b.at)
         .slice(0, 6),
     // Recompute once a minute rather than every second.

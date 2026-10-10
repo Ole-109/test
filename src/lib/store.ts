@@ -61,44 +61,85 @@ export function defaultState(): AppState {
   };
 }
 
-/** Merge persisted (possibly older or partial) data over defaults. */
+/** Plain object or undefined (arrays, null and primitives are rejected). */
+const obj = <T,>(v: unknown): Partial<T> | undefined => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Partial<T>) : undefined);
+/** Array of objects; anything else (null entries from a damaged file) is dropped. */
+const list = <T,>(v: unknown): T[] | undefined => (Array.isArray(v) ? (v.filter((x) => x && typeof x === 'object') as T[]) : undefined);
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
+
+/**
+ * Merge persisted (possibly older, partial or hand-edited) data over defaults.
+ * Values the app switches on (language, theme, server…) are checked, so a bad
+ * file can't leave the app unable to render.
+ */
 export function hydrate(raw: unknown): AppState {
   const base = defaultState();
-  if (!raw || typeof raw !== 'object') return base;
-  const r = raw as Partial<AppState>;
+  const r = obj<AppState>(raw);
+  if (!r) return base;
   const banners = { ...base.banners };
   for (const k of Object.keys(banners) as BannerKey[]) {
-    if (r.banners?.[k]) banners[k] = { ...emptyBanner(), ...r.banners[k] };
+    const b = obj<BannerState>(r.banners?.[k]);
+    if (b) banners[k] = { ...emptyBanner(), ...b, history: list(b.history) ?? [] };
   }
   // Keep user task state but add any new built-in tasks.
-  const tasks = Array.isArray(r.tasks) ? [...r.tasks] : base.tasks;
+  const tasks = list<AppState['tasks'][number]>(r.tasks) ?? base.tasks;
   for (const t of DEFAULT_TASKS) if (!tasks.some((x) => x.id === t.id)) tasks.push({ ...t });
+  const st = { ...base.settings, ...obj<AppState['settings']>(r.settings) };
+  const inv = obj<AppState['inventory']>(r.inventory) ?? {};
   return {
     ...base,
     ...r,
     version: 1,
-    settings: { ...base.settings, ...r.settings },
-    resin: { ...base.resin, ...r.resin },
+    settings: {
+      ...st,
+      lang: oneOf(st.lang, ['en', 'de'] as const, base.settings.lang),
+      theme: oneOf(st.theme, ['system', 'light', 'dark'] as const, 'system'),
+      server: oneOf(st.server, ['america', 'europe', 'asia'] as const, base.settings.server),
+      titleLang: oneOf(st.titleLang, ['romaji', 'english', 'native'] as const, 'romaji'),
+      resinCap: Number.isFinite(st.resinCap) ? Math.min(400, Math.max(60, st.resinCap)) : base.settings.resinCap,
+    },
+    resin: { ...base.resin, ...obj<AppState['resin']>(r.resin) },
     tasks,
-    characters: r.characters ?? {},
-    customCharacters: r.customCharacters ?? [],
+    characters: (obj<AppState['characters']>(r.characters) ?? {}) as AppState['characters'],
+    customCharacters: list(r.customCharacters) ?? [],
     banners,
-    plan: { ...base.plan, ...r.plan },
-    anime: Array.isArray(r.anime) ? r.anime.map(repairAnime) : [],
-    wishes: Array.isArray(r.wishes) ? r.wishes : [],
-    wishMeta: { ...base.wishMeta, ...r.wishMeta, overrides: { ...r.wishMeta?.overrides } },
-    inventory: { ...base.inventory, ...r.inventory },
-    account: { ...r.account },
-    farming: Array.isArray(r.farming) ? r.farming : [],
-    achievements: { ...r.achievements, done: { ...r.achievements?.done } },
+    plan: { ...base.plan, ...obj<AppState['plan']>(r.plan) },
+    anime: (list<AppState['anime'][number]>(r.anime) ?? []).map(repairAnime),
+    wishes: list(r.wishes) ?? [],
+    wishMeta: { ...base.wishMeta, ...obj<AppState['wishMeta']>(r.wishMeta), overrides: { ...(obj(r.wishMeta?.overrides) as AppState['wishMeta']['overrides']) } },
+    inventory: {
+      ...base.inventory,
+      ...inv,
+      weapons: list(inv.weapons) ?? [],
+      artifacts: list(inv.artifacts) ?? [],
+      materials: obj<Record<string, number>>(inv.materials) ?? {},
+    } as AppState['inventory'],
+    account: { ...obj<AppState['account']>(r.account) },
+    farming: list(r.farming) ?? [],
+    achievements: { ...obj<AppState['achievements']>(r.achievements), done: { ...(obj(r.achievements?.done) as AppState['achievements']['done']) } },
   };
 }
 
+/** A Waypoint backup (Settings → Export): `{ app: 'waypoint', data }` or the bare state. */
+export function isWaypointBackup(json: unknown): json is { app: 'waypoint'; data: unknown } | AppState {
+  const j = obj<Record<string, unknown>>(json);
+  if (!j) return false;
+  const data = j.app === 'waypoint' ? obj<Record<string, unknown>>(j.data) : j;
+  return !!data && !!obj(data.settings) && Array.isArray(data.tasks);
+}
+
 function load(): AppState {
+  let text: string | null = null;
   try {
-    const text = localStorage.getItem(STORAGE_KEY);
+    text = localStorage.getItem(STORAGE_KEY);
     return hydrate(text ? JSON.parse(text) : null);
   } catch {
+    // Keep the unreadable data aside instead of overwriting it with defaults on the next save.
+    try {
+      if (text) localStorage.setItem(`${STORAGE_KEY}:corrupt-${Date.now()}`, text);
+    } catch {
+      /* storage full or blocked */
+    }
     return defaultState();
   }
 }

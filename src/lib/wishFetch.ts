@@ -36,6 +36,8 @@ export async function importFromLink(
     onProgress,
     signal,
   };
-  await validateWishUrl(info, opts);
-  return fetchWishHistory(info, opts);
+  const linkUid = await validateWishUrl(info, opts);
+  const res = await fetchWishHistory(info, opts);
+  // When nothing new was fetched the history has no uid of its own; the link check knows it.
+  return { ...res, uid: res.uid ?? linkUid };
 }

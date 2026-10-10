@@ -62,7 +62,7 @@ export function Library() {
         (b.episodes ? b.progress / b.episodes : 0) - (a.episodes ? a.progress / a.episodes : 0) || b.updatedAt - a.updatedAt,
     };
     return anime
-      .filter((a) => (tab === 'all' || a.status === tab) && (!format || a.format === format) && (!unrated || isUnrated(a)) && match(a))
+      .filter((a) => (tab === 'all' || a.status === tab) && (!format || a.format === format) && match(a))
       .sort((a, b) => {
         // In "Watching", shows with new episodes come first.
         if (tab === 'watching' && sort === 'updated') {
@@ -76,12 +76,13 @@ export function Library() {
         }
         return cmp[sort](a, b);
       });
-  }, [anime, tab, format, unrated, q, sort, titleLang, now]);
-
-  const unratedCount = useMemo(() => anime.filter((a) => (tab === 'all' || a.status === tab) && isUnrated(a)).length, [anime, tab]);
+  }, [anime, tab, format, q, sort, titleLang, now]);
 
   /** A show must have every selected category. */
-  const list = useMemo(() => (cats.length ? base.filter((a) => cats.every((c) => a.genres.includes(c))) : base), [base, cats]);
+  const inCats = useMemo(() => (cats.length ? base.filter((a) => cats.every((c) => a.genres.includes(c))) : base), [base, cats]);
+  // Counted with every other filter applied, so the number matches what the toggle shows.
+  const unratedCount = useMemo(() => inCats.filter(isUnrated).length, [inCats]);
+  const list = useMemo(() => (unrated ? inCats.filter(isUnrated) : inCats), [inCats, unrated]);
 
   const chips = useMemo(() => {
     const count = new Map<string, number>();
@@ -113,7 +114,7 @@ export function Library() {
       <PageHeader
        
         title={t('anime.title')}
-        subtitle={t.n('anime.subtitle', anime.length, { e: t.num(episodesWatched) })}
+        subtitle={`${t.n('anime.subtitle', anime.length)} · ${t.n('anime.watchedEps', episodesWatched)}`}
         actions={
           <>
             <Button icon={<PenLine size={16} />} onClick={() => setManual(true)}>

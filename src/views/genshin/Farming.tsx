@@ -43,11 +43,22 @@ export function useFarmToday() {
   const now = useNow(60_000);
   const server = useStore((s) => s.settings.server);
   const farming = useStore((s) => s.farming);
+  const characters = useStore((s) => s.characters);
+  const materials = useStore((s) => s.inventory.materials);
   const weekday = serverWeekday(now, server);
   const open = useMemo(() => {
     const out = new Map<string, { book: MaterialDef; characters: string[] }>();
     for (const f of farming) {
+      const cur = characters[f.id];
+      const req = requirementFor(f.id, { level: cur?.level ?? 1, ascension: cur?.ascension, talents: cur?.talents ?? [1, 1, 1] }, f);
+      // Book series this character still needs (after what's in the inventory).
+      const needed = new Set<string>();
+      for (const [id, n] of req.items) {
+        const m = MATERIALS[id];
+        if (m?.kind === 'book' && n > haveOf(materials, id)) needed.add(String(Number(id) - (m.rank - 2)));
+      }
       for (const green of bookSeriesOf(f.id)) {
+        if (!needed.has(green)) continue;
         const book = MATERIALS[green];
         if (!book || !isOpenOn(book, weekday)) continue;
         const e = out.get(green) ?? { book, characters: [] };
@@ -56,7 +67,7 @@ export function useFarmToday() {
       }
     }
     return [...out.values()];
-  }, [farming, weekday]);
+  }, [farming, characters, materials, weekday]);
   return { weekday, open };
 }
 
@@ -135,11 +146,14 @@ function PlanRow({ c }: { c: CharacterDef }) {
               onChange={(e) => patchFarmTarget(c.id, { level: Number(e.target.value) })}
               aria-label={t('farm.level')}
             >
-              {[40, 50, 60, 70, 80, 90].filter((l) => l >= curLevel || l === target.level).map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
+              {[...new Set([40, 50, 60, 70, 80, 90, target.level])]
+                .filter((l) => l >= curLevel || l === target.level)
+                .sort((a, b) => a - b)
+                .map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
             </select>
           </label>
           {talentLabels.map((k, i) => (

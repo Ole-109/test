@@ -8,7 +8,7 @@ import { GachaApiError, type FetchProgress } from '../../core/gachaApi';
 import { ImportError, parseImport, partsOf, toUigfV4, type ImportPart, type ImportResult } from '../../core/formats';
 import { restore, snapshot } from '../../lib/actions';
 import { applyImport, clearWishes, type ImportSummary } from '../../lib/importActions';
-import { useStore } from '../../lib/store';
+import { getState, useStore } from '../../lib/store';
 import { importFromLink } from '../../lib/wishFetch';
 import { TeyvatTabs } from './TeyvatTabs';
 
@@ -84,6 +84,18 @@ function Summary({ s, label }: { s: ImportSummary; label: string }) {
   );
 }
 
+/**
+ * Wishes from another account must not be mixed into the stored history.
+ * Returns false to cancel; on "replace" the stored wishes are cleared first.
+ */
+function confirmAccount(t: ReturnType<typeof useT>, uid: string | undefined): boolean {
+  const current = getState().wishMeta.uid;
+  if (!uid || !current || uid === current || !getState().wishes.length) return true;
+  if (!window.confirm(t('import.otherAccount', { uid, current }))) return false;
+  clearWishes();
+  return true;
+}
+
 function FileDrop({ onResult }: { onResult: (s: ImportSummary, label: string) => void }) {
   const t = useT();
   const input = useRef<HTMLInputElement>(null);
@@ -93,6 +105,8 @@ function FileDrop({ onResult }: { onResult: (s: ImportSummary, label: string) =>
 
   const apply = (result: ImportResult, file: string, parts?: ImportPart[]) => {
     const before = snapshot();
+    const withWishes = !!result.wishes?.records.length && (!parts || parts.includes('wishes'));
+    if (withWishes && !confirmAccount(t, result.wishes!.uid)) return;
     const summary = applyImport(result, parts);
     setPending(null);
     onResult(summary, `${result.label} · ${file}`);
@@ -110,7 +124,7 @@ function FileDrop({ onResult }: { onResult: (s: ImportSummary, label: string) =>
       if (result.kind === 'paimon' || result.accounts || partsOf(result).length > 1) setPending({ result, file: file.name });
       else apply(result, file.name);
     } catch (e) {
-      setError(e instanceof ImportError ? e.message : t('settings.importFailed'));
+      setError(e instanceof ImportError ? t(`import.error.${e.code}` as MessageKey) : t('settings.importFailed'));
     }
   };
 
@@ -293,6 +307,7 @@ function LinkImport({ onResult }: { onResult: (s: ImportSummary, label: string) 
     ctrl.current = new AbortController();
     try {
       const res = await importFromLink(link, (p) => setProgress((cur) => ({ ...cur, [p.gachaType]: p })), ctrl.current.signal);
+      if (!confirmAccount(t, res.uid)) return;
       const summary = applyImport({ kind: 'uigf', label: 'Wish link', wishes: res });
       onResult(summary, 'Wish link');
       setLink('');

@@ -6,7 +6,7 @@
  *  - GOOD (Inventory Kamera, Genshin Optimizer, …)
  *  - Waypoint export bundles written by the CLI in tools/
  */
-import { findCharacter, findWeapon } from '../data/characters';
+import { characterByAvatarId, findCharacter, findWeapon } from '../data/characters';
 import type { Account, GachaType, Server, WishRecord } from '../lib/types';
 import { isUiaf, parsePaimonAchievements, parseUiaf, type Done, type UiafFile } from './achievements';
 import type { GoodData } from './good';
@@ -64,7 +64,17 @@ export function partsOf(r: ImportResult): ImportPart[] {
   return parts;
 }
 
-export class ImportError extends Error {}
+export type ImportErrorCode = 'uigfEmpty' | 'paimonEmpty' | 'notJson' | 'unknown' | 'waypointBackup';
+
+/** Import failure with an English message (CLI) and a code the app translates. */
+export class ImportError extends Error {
+  constructor(
+    message: string,
+    public code: ImportErrorCode = 'unknown',
+  ) {
+    super(message);
+  }
+}
 
 // ── UIGF ──────────────────────────────────────────────────────────────────
 
@@ -106,16 +116,33 @@ function rankOf(name: string, kind: 'character' | 'weapon', rank?: string): 3 | 
   return (r >= 5 ? 5 : r === 4 ? 4 : 3) as 3 | 4 | 5;
 }
 
+/** Game item from a UIGF `item_id`: 8-digit ids starting with 1 are characters, 5-digit ids weapons. */
+function itemById(itemId?: string): { name: string; kind: 'character' | 'weapon' } | undefined {
+  if (!itemId) return undefined;
+  if (/^1\d{7}$/.test(itemId)) {
+    const c = characterByAvatarId(Number(itemId));
+    return c && { name: c.name, kind: 'character' };
+  }
+  if (/^\d{5}$/.test(itemId)) {
+    const w = findWeapon(Number(itemId));
+    return w && { name: w.name, kind: 'weapon' };
+  }
+  return undefined;
+}
+
 function fromUigfItem(i: UigfItem): WishRecord | null {
   const type = String(i.gacha_type ?? i.uigf_gacha_type);
-  if (!GACHA_TYPES.has(type) || !i.name || !i.time) return null;
-  const itemType = itemKind(i.name, i.item_type, i.item_id);
+  // UIGF v4 makes `name` optional and files can be in any language: the item id is the reliable key.
+  const known = itemById(i.item_id);
+  const name = known?.name ?? i.name;
+  if (!GACHA_TYPES.has(type) || !name || !i.time) return null;
+  const itemType = known?.kind ?? itemKind(name, i.item_type, i.item_id);
   return {
     id: String(i.id),
     gachaType: type as GachaType,
-    name: i.name,
+    name,
     itemType,
-    rank: rankOf(i.name, itemType, i.rank_type),
+    rank: rankOf(name, itemType, i.rank_type),
     time: i.time,
     itemId: i.item_id || undefined,
   };
@@ -125,7 +152,7 @@ function parseUigf(json: Record<string, unknown>): ImportResult {
   // v4: { info, hk4e: [{ uid, list }] }
   if (Array.isArray(json.hk4e)) {
     const accounts = json.hk4e as UigfV4['hk4e'];
-    if (!accounts.length) throw new ImportError('This UIGF file contains no Genshin Impact accounts.');
+    if (!accounts.length) throw new ImportError('This UIGF file contains no Genshin Impact accounts.', 'uigfEmpty');
     // Pick the account with the most pulls when a file contains several.
     const acc = [...accounts].sort((a, b) => (b.list?.length ?? 0) - (a.list?.length ?? 0))[0];
     const records = (acc.list ?? []).map(fromUigfItem).filter((r): r is WishRecord => !!r);
@@ -198,8 +225,10 @@ const isPaimonKey = (k: string) => /^(account\d+-)?(wish-counter-|achievement$|c
 
 function paimonWishes(json: Record<string, unknown>, prefix: string): WishRecord[] {
   const records: WishRecord[] = [];
-  let seq = 0;
   for (const [key, type] of Object.entries(PAIMON_KEYS)) {
+    // Position among pulls of this banner in the same second: keeps ids stable when another
+    // banner gains pulls in a newer backup (a global counter would shift every later id).
+    const sameSecond = new Map<string, number>();
     const pulls = ((json[prefix + key] as { pulls?: PaimonPull[] } | undefined)?.pulls ?? []) as PaimonPull[];
     for (const p of pulls) {
       if (!p?.id || !p.time) continue;
@@ -207,10 +236,12 @@ function paimonWishes(json: Record<string, unknown>, prefix: string): WishRecord
       const kind: 'character' | 'weapon' = p.type === 'weapon' ? 'weapon' : p.type === 'character' ? 'character' : itemKind(name);
       const def = kind === 'character' ? findCharacter(name) : findWeapon(name);
       const code = p.code && GACHA_TYPES.has(p.code) ? (p.code as GachaType) : type;
-      // paimon.moe stores no record ids; build sortable synthetic ones from time + order.
+      // paimon.moe stores no record ids; build sortable synthetic ones from time, banner and order.
       const ts = String(recordTime(p.time)).padStart(13, '0');
+      const n = sameSecond.get(ts) ?? 0;
+      sameSecond.set(ts, n + 1);
       records.push({
-        id: `p${ts}${String(seq++).padStart(6, '0')}`,
+        id: `p${ts}${type}${String(n).padStart(3, '0')}`,
         gachaType: code,
         name: def?.name ?? name.replace(/\b\w/g, (c) => c.toUpperCase()),
         itemType: kind,
@@ -267,7 +298,7 @@ function parsePaimon(json: Record<string, unknown>): ImportResult {
   ]
     .filter((a) => partsOf(a.result).some((p) => p !== 'profile'))
     .map((a) => ({ ...a, result: { ...a.result, savedAt } }));
-  if (!accounts.length) throw new ImportError('This paimon.moe backup contains no wishes, achievements or characters.');
+  if (!accounts.length) throw new ImportError('This paimon.moe backup contains no wishes, achievements or characters.', 'paimonEmpty');
   return { ...accounts[0].result, accounts: accounts.length > 1 ? accounts : undefined };
 }
 
@@ -278,12 +309,12 @@ export function parseImport(text: string): ImportResult {
   try {
     json = JSON.parse(text.replace(/^﻿/, ''));
   } catch {
-    throw new ImportError('This file is not valid JSON.');
+    throw new ImportError('This file is not valid JSON.', 'notJson');
   }
   if (!json || typeof json !== 'object') throw new ImportError('Unrecognised file.');
 
   if ((json.app === 'waypoint' && json.data) || ('settings' in json && 'tasks' in json)) {
-    throw new ImportError('This is a Waypoint backup. Restore it under Settings → Import backup.');
+    throw new ImportError('This is a Waypoint backup. Restore it under Settings → Import backup.', 'waypointBackup');
   }
   if (json.format === 'waypoint-export') {
     const b = json as unknown as WaypointBundle;
@@ -307,31 +338,43 @@ const isSynthetic = (r: WishRecord) => r.id.startsWith('p');
 const dedupeKey = (r: WishRecord) => `${POOL_OF[r.gachaType]}|${r.time}|${r.name.toLowerCase()}`;
 
 /**
- * Merges imported records into existing ones. Real records (with HoYoverse ids)
- * replace matching synthetic ones from paimon.moe backups, and vice versa
- * synthetic records never duplicate real ones.
+ * Merges imported records into existing ones. A pull is recognised by banner,
+ * time and name whenever one side is a synthetic paimon.moe record (those have
+ * no real ids): real records replace synthetic ones, synthetic records never
+ * duplicate what is stored. Each stored record matches at most one incoming
+ * one, so identical pulls in one 10-pull are kept apart. `remap` lists ids
+ * that were replaced (old → new), for moving 50/50 corrections along.
  */
-export function mergeWishes(existing: WishRecord[], incoming: WishRecord[]): { list: WishRecord[]; added: number } {
-  const ids = new Set(existing.map((r) => r.id));
+export function mergeWishes(
+  existing: WishRecord[],
+  incoming: WishRecord[],
+): { list: WishRecord[]; added: number; remap: Map<string, string> } {
+  const byId = new Map(existing.map((r) => [r.id, r]));
   const byKey = new Map<string, WishRecord[]>();
   for (const r of existing) {
     const k = dedupeKey(r);
     byKey.set(k, [...(byKey.get(k) ?? []), r]);
   }
-  const consumed = new Set<WishRecord>(); // existing records matched by an incoming twin
+  const consumed = new Set<WishRecord>(); // stored records matched by an incoming twin
   const replaced = new Set<WishRecord>(); // synthetic records superseded by real ones
+  const remap = new Map<string, string>();
   const added: WishRecord[] = [];
   for (const r of incoming) {
-    if (ids.has(r.id)) continue;
-    const twin = (byKey.get(dedupeKey(r)) ?? []).find((c) => isSynthetic(c) !== isSynthetic(r) && !consumed.has(c));
+    const same = byId.get(r.id);
+    if (same) {
+      consumed.add(same);
+      continue;
+    }
+    const twin = (byKey.get(dedupeKey(r)) ?? []).find((c) => !consumed.has(c) && (isSynthetic(c) || isSynthetic(r)));
     if (twin) {
       consumed.add(twin);
-      if (isSynthetic(r)) continue; // the real record is already stored
+      if (isSynthetic(r) || !isSynthetic(twin)) continue; // already stored
       replaced.add(twin);
+      remap.set(twin.id, r.id);
     }
     added.push(r);
-    ids.add(r.id);
+    byId.set(r.id, r);
   }
   const list = sortRecords([...existing.filter((r) => !replaced.has(r)), ...added]);
-  return { list, added: added.length - replaced.size };
+  return { list, added: added.length - replaced.size, remap };
 }

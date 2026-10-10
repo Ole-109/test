@@ -137,7 +137,7 @@ function Artifacts() {
         </select>
         <Segmented
           size="sm"
-          label="Rarity"
+          label={t('inv.rarity')}
           value={minRarity}
           onChange={setMinRarity}
           options={[5, 4, 1].map((n) => ({ value: n, label: n === 1 ? t('common.all') : t('inv.minRarity', { n }) }))}
@@ -279,8 +279,16 @@ export function Inventory() {
   const inv = useStore((s) => s.inventory);
   const wishes = useStore((s) => s.wishes);
   const pulled = useMemo(() => weaponCopies(wishes), [wishes]);
-  const has = { weapons: inv.weapons.length, pulled: pulled.length, artifacts: inv.artifacts.length, materials: Object.keys(inv.materials).length };
-  const [tab, setTab] = useState<Tab>(has.weapons ? 'weapons' : has.pulled ? 'pulled' : has.artifacts ? 'artifacts' : 'weapons');
+  const has = {
+    weapons: inv.weapons.length,
+    pulled: pulled.length,
+    artifacts: inv.artifacts.length,
+    // Same rule as the list: only materials you actually have.
+    materials: Object.values(inv.materials).filter((n) => n > 0).length,
+  };
+  const [tab, setTab] = useState<Tab>(
+    has.weapons ? 'weapons' : has.pulled ? 'pulled' : has.artifacts ? 'artifacts' : has.materials ? 'materials' : 'weapons',
+  );
   const df = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' });
   const empty = !has.weapons && !has.pulled && !has.artifacts && !has.materials;
 

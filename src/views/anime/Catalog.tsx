@@ -75,6 +75,8 @@ export function Catalog({
   const cursor = useRef<CatalogCursor | null>(null);
   /** Synchronous busy flag: the scroll observer can fire before React re-renders. */
   const busyRef = useRef(false);
+  /** What the last operation was, so "Retry" repeats a failed letter jump instead of appending. */
+  const lastKind = useRef<'load' | 'jump'>('load');
   const gen = useRef(0);
   const ctrl = useRef<AbortController | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -98,6 +100,7 @@ export function Catalog({
     const c = cursor.current;
     if (!c) return;
     const g = gen.current;
+    lastKind.current = kind;
     busyRef.current = true;
     setBusy(kind);
     setError(null);
@@ -157,7 +160,8 @@ export function Catalog({
 
   const retry = () => {
     setError(null);
-    if (!items.length) restart();
+    if (lastKind.current === 'jump' && letter) jump(letter);
+    else if (!items.length) restart();
     else run('load', (c) => c.next(BATCH), false);
   };
 

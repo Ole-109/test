@@ -6,7 +6,7 @@ import { toast } from '../../components/toast';
 import { Button, Field, IconButton, PageHeader, Segmented, Stepper, TextInput } from '../../components/ui';
 import { useT, type T } from '../../i18n';
 import type { MessageKey } from '../../i18n/en';
-import { addTask, patchTask, removeTask, restore, snapshot, toggleTask } from '../../lib/actions';
+import { addTask, patchTask, removeTask, toggleTask } from '../../lib/actions';
 import { useNow } from '../../lib/hooks';
 import { useStore } from '../../lib/store';
 import { formatDuration, isTaskDone, nextDailyReset, nextWeeklyReset, taskNextReset } from '../../lib/time';
@@ -148,11 +148,10 @@ function TaskRow({ task, now, server, editing }: { task: Task; now: number; serv
             <IconButton
               label={t('common.delete')}
               onClick={() => {
-                const snap = snapshot();
-                removeTask(task.id);
+                const undo = removeTask(task.id);
                 toast({
                   message: t('common.deleted', { name: label }),
-                  action: { label: t('common.undo'), run: () => restore(snap) },
+                  action: { label: t('common.undo'), run: undo },
                 });
               }}
             >

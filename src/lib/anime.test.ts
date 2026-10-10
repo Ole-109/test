@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { airedEpisodes, behindBy, isUnrated, occurrences, projectedAiring, repairAnime, withProgress, withStatus } from './anime';
+import { airedEpisodes, behindBy, isUnrated, occurrences, projectedAiring, repairAnime, withProgress, withStatus, withSynced } from './anime';
 import { hydrate } from './store';
 import { DAY } from './time';
 import type { AnimeEntry } from './types';
@@ -88,9 +88,30 @@ describe('unrated', () => {
     expect(done.progress).toBe(24);
     const planned = withStatus(done, 'planning', 2000);
     expect(planned).toMatchObject({ status: 'planning', progress: 0, completedAt: undefined });
-    // Back to "Watching" keeps the episodes but is no longer completed.
+    // Back to "Watching" after finishing is a rewatch from episode 0.
     const watching = withStatus(done, 'watching', 2000);
-    expect(watching).toMatchObject({ status: 'watching', progress: 24, completedAt: undefined });
+    expect(watching).toMatchObject({ status: 'watching', progress: 0, rewatches: 1, completedAt: undefined });
+    // Completed → Paused → Plan to watch also ends up unwatched.
+    expect(withStatus(withStatus(done, 'paused', 2000), 'planning', 3000)).toMatchObject({ progress: 0, completedAt: undefined });
+    // Re-selecting the current status changes nothing.
+    expect(withStatus(done, 'completed', 9999)).toBe(done);
+  });
+
+  it('only stepping forward completes a show', () => {
+    // Total lowered below progress, then −1: must not complete.
+    const over = entry({ status: 'watching', progress: 12, episodes: 10 });
+    expect(withProgress(over, 11).status).toBe('watching');
+    expect(withProgress(entry({ status: 'watching', progress: 9, episodes: 10 }), 10).status).toBe('completed');
+  });
+
+  it('merges AniList data without losing what the user set', () => {
+    const typed = entry({ status: 'watching', progress: 3, episodes: 12 });
+    expect(withSynced(typed, { episodes: undefined, airStatus: 'RELEASING' }).episodes).toBe(12);
+    // A completed show with an unknown total gets its episodes once the total is known.
+    expect(withSynced(entry({ status: 'completed', progress: 0 }), { episodes: 13 }).progress).toBe(13);
+    // Watched every episode of a show that has now finished airing → completed.
+    const done = withSynced(entry({ status: 'watching', progress: 12 }), { episodes: 12, airStatus: 'FINISHED' }, 5);
+    expect(done).toMatchObject({ status: 'completed', completedAt: 5 });
   });
 
   it('repairs entries saved by older versions', () => {
@@ -99,5 +120,19 @@ describe('unrated', () => {
     const fine = entry({ status: 'planning', progress: 0 });
     expect(repairAnime(fine)).toBe(fine);
     expect(hydrate({ anime: [broken] }).anime[0].progress).toBe(0);
+  });
+});
+
+describe('schedule', () => {
+  it('does not invent an airing in a week the show skipped', () => {
+    const week = 7 * DAY;
+    const now = Date.UTC(2026, 9, 12, 12); // Monday
+    // Next episode (6) airs in 12 days: the week in between has no airing.
+    const a = entry({ status: 'watching', nextAiring: { at: now + 12 * DAY, episode: 6 } });
+    const list = occurrences(a, now - DAY, now - DAY + week, now);
+    expect(list).toHaveLength(0);
+    // An episode that aired earlier today still shows.
+    const b = entry({ status: 'watching', nextAiring: { at: now + week - 3600_000, episode: 6 } });
+    expect(occurrences(b, now - 6 * 3600_000, now + DAY, now).map((o) => o.episode)).toEqual([5]);
   });
 });

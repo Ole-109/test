@@ -111,7 +111,8 @@ function useResinNotifier() {
     if (delay > 2 ** 31 - 1) return;
     const timer = setTimeout(() => {
       try {
-        new Notification('Waypoint', { body: translate(lang, 'resin.notifyBody', { n: cap }), icon: './favicon.svg' });
+        // The tag collapses duplicates when Waypoint is open in several tabs.
+        new Notification('Waypoint', { body: translate(lang, 'resin.notifyBody', { n: cap }), icon: './favicon.svg', tag: 'waypoint-resin' });
       } catch {
         /* some platforms only allow notifications from a service worker */
       }
@@ -199,7 +200,11 @@ export function App() {
         e.preventDefault();
         setUI({ palette: true });
       } else if (k === 'n') navigate('/discover');
-      else if (e.key === '?') navigate('/settings');
+      else if (e.key === '?') {
+        // Open the shortcut list (at the end of Settings), also when Settings is already open.
+        navigate('/settings');
+        setTimeout(() => document.getElementById('set-keys')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60);
+      }
     },
   );
 
@@ -219,7 +224,7 @@ export function App() {
       <a className="skip-link" href="#main">
         {t('nav.skip')}
       </a>
-      <aside className="sidebar" aria-label="Primary">
+      <aside className="sidebar" aria-label={t('nav.primary')}>
         <a href={href('/')} className="brand">
           <Logo size={30} />
           <span className="brand-text">
@@ -305,7 +310,7 @@ export function App() {
         </div>
       </main>
 
-      <nav className="tabbar" aria-label="Primary">
+      <nav className="tabbar" aria-label={t('nav.primary')}>
         <a href={href('/')} className={route === '/' ? 'is-active' : ''} aria-current={route === '/' ? 'page' : undefined}>
           <House size={20} />
           <span>{t('nav.home')}</span>

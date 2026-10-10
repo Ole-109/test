@@ -8,8 +8,8 @@ import { CharacterIcon, ElementIcon, ItemIcon } from '../../components/visuals';
 import { findArtifactSet, findCharacter, findWeapon } from '../../data/characters';
 import { critValue, fromGoodKey, STAT_LABEL } from '../../core/good';
 import { useT } from '../../i18n';
-import { addFarmTarget, patchCharacter, restore, setOwned, snapshot } from '../../lib/actions';
-import { update, useStore } from '../../lib/store';
+import { addFarmTarget, patchCharacter, removeCustomCharacter, removeOwned, setOwned } from '../../lib/actions';
+import { useStore } from '../../lib/store';
 import type { BuildStatus, CharacterDef } from '../../lib/types';
 
 const LEVEL_PRESETS = [20, 40, 50, 60, 70, 80, 90];
@@ -36,9 +36,8 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
   );
 
   const remove = () => {
-    const snap = snapshot();
-    setOwned(c.id, false);
-    toast({ message: t('chars.removed', { name: c.name }), action: { label: t('common.undo'), run: () => restore(snap) } });
+    const undo = removeOwned(c.id);
+    toast({ message: t('chars.removed', { name: c.name }), action: { label: t('common.undo'), run: undo } });
   };
 
   return (
@@ -64,10 +63,9 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
             variant="danger"
             icon={<Trash2 size={16} />}
             onClick={() => {
-              const snap = snapshot();
-              update('customCharacters', (cs) => cs.filter((x) => x.id !== c.id));
+              const undo = removeCustomCharacter(c.id);
               onClose();
-              toast({ message: t('common.deleted', { name: c.name }), action: { label: t('common.undo'), run: () => restore(snap) } });
+              toast({ message: t('common.deleted', { name: c.name }), action: { label: t('common.undo'), run: undo } });
             }}
           >
             {t('chars.deleteCustom')}
@@ -93,7 +91,7 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
         <div className="form">
           <div className="row between">
             <Field label={t('chars.level')}>
-              <Stepper label={t('chars.level')} value={o.level} min={1} max={100} onChange={(level) => patchCharacter(c.id, { level })} />
+              <Stepper label={t('chars.level')} value={o.level} min={1} max={100} onChange={(level) => patchCharacter(c.id, { level, ascension: undefined })} />
             </Field>
             <IconButton
               label={o.favorite ? t('common.unfavorite') : t('common.favorite')}
@@ -110,7 +108,7 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
                 key={l}
                 type="button"
                 className={`chip-btn ${o.level === l ? 'is-active' : ''}`}
-                onClick={() => patchCharacter(c.id, { level: l })}
+                onClick={() => patchCharacter(c.id, { level: l, ascension: undefined })}
               >
                 {l}
               </button>
