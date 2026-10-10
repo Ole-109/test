@@ -33,6 +33,7 @@ export const MediaCard = memo(function MediaCard({
     <article className="media-card">
       <button type="button" className="media-open" onClick={onOpen} aria-label={title}>
         <Cover src={m.coverImage.extraLarge ?? m.coverImage.large ?? undefined} title={title} color={m.coverImage.color ?? undefined} />
+        {m.isAdult && <span className="media-adult">18+</span>}
         {m.averageScore != null && (
           <span className="media-score">
             <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden /> {m.averageScore}%

@@ -26,6 +26,7 @@ export function defaultState(): AppState {
       resinNotify: false,
       sidebarCollapsed: false,
       proxyUrl: '',
+      showAdult: false,
     },
     resin: { value: 0, at: Date.now(), condensed: 0, fragile: 0 },
     tasks: DEFAULT_TASKS.map((t) => ({ ...t })),

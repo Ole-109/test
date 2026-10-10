@@ -684,4 +684,6 @@ export const de: Record<MessageKey, string> = {
   "catalog.emptyBody": "Entferne eine Kategorie oder einen anderen Filter.",
   "catalog.truncated": "AniList hat in einem Teil dieser Liste aufgehört zu blättern, daher fehlen eventuell einige Einträge. Ein weiterer Filter grenzt die Liste ein.",
   "catalog.more": "Mehr laden",
+  "settings.showAdult": "18+-Anime anzeigen",
+  "settings.showAdultHint": "Zeigt in „Entdecken“ und im gesamten Katalog auch Titel, die AniList als nicht jugendfrei markiert, z. B. Yosuga no Sora. Standardmäßig aus.",
 };

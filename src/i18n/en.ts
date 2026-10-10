@@ -682,6 +682,8 @@ export const en = {
   "catalog.emptyBody": "Remove a category or another filter.",
   "catalog.truncated": "AniList stopped paging in one part of this list, so a few entries may be missing. Add a filter to narrow it down.",
   "catalog.more": "Load more",
+  "settings.showAdult": "Show 18+ anime",
+  "settings.showAdultHint": "Includes titles AniList marks as adult, such as Yosuga no Sora, in Discover and the full catalog. Off by default.",
 } as const;
 
 export type MessageKey = keyof typeof en;

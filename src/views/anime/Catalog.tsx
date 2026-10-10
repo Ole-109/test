@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import type { AniMedia } from '../../lib/anilist';
 import { anilistFetcher, CatalogCursor, RateLimitError, type CatalogFilters, type CatalogItem, type CatalogSort } from '../../lib/catalog';
 import type { AnimeEntry, AnimeStatus } from '../../lib/types';
-import { airLabel, formatLabel, genreLabel, GENRES, seasonLabel } from './labels';
+import { airLabel, formatLabel, genreLabel, genresFor, seasonLabel } from './labels';
 import { MediaCard, mediaTitle } from './MediaCard';
 
 const STATE_KEY = 'waypoint:catalog';
@@ -39,6 +39,7 @@ function loadSaved(): Saved {
  */
 export function Catalog({
   query,
+  adult,
   titleLang,
   owned,
   onOpenOwned,
@@ -46,6 +47,8 @@ export function Catalog({
   onAdd,
 }: {
   query: string;
+  /** Include titles AniList marks as adult (18+). */
+  adult: boolean;
   titleLang: string;
   owned: Map<number, AnimeEntry>;
   onOpenOwned: (id: string) => void;
@@ -55,7 +58,11 @@ export function Catalog({
   const t = useT();
   const [saved, setSaved] = useState(loadSaved);
   const { filters: base, sort } = saved;
-  const filters = useMemo<CatalogFilters>(() => ({ ...base, search: query || undefined }), [base, query]);
+  const filters = useMemo<CatalogFilters>(
+    // The adult-only genre is ignored while 18+ titles are hidden.
+    () => ({ ...base, genres: adult ? base.genres : base.genres.filter((g) => g !== 'Hentai'), search: query || undefined, adult: adult || undefined }),
+    [base, query, adult],
+  );
   const key = JSON.stringify([filters, sort]);
 
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -243,7 +250,7 @@ export function Catalog({
       </div>
 
       <div className="cat-chips" role="group" aria-label={t('anime.category')}>
-        {GENRES.map((g) => {
+        {genresFor(adult).map((g) => {
           const on = base.genres.includes(g);
           return (
             <button key={g} type="button" className={`cat-chip ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={() => toggleGenre(g)}>

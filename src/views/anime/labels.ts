@@ -9,7 +9,7 @@ export const airLabel = (t: T, s?: string) => (s ? (has(`air.${s}`) ? t(`air.${s
 export const seasonLabel = (t: T, s?: string, y?: number) =>
   [s && has(`season.${s}`) ? t(`season.${s}` as MessageKey) : s, y].filter(Boolean).join(' ');
 
-/** AniList's genres (adult genre left out). */
+/** AniList's genres (the adult-only genre is added by `genresFor`). */
 export const GENRES = [
   'Action',
   'Adventure',
@@ -30,6 +30,9 @@ export const GENRES = [
   'Supernatural',
   'Thriller',
 ];
+
+/** Genres to offer; "Hentai" only when 18+ titles are shown. */
+export const genresFor = (adult: boolean) => (adult ? [...GENRES, 'Hentai'] : GENRES);
 
 const GENRE_DE: Record<string, string> = {
   Adventure: 'Abenteuer',

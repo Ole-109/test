@@ -26,6 +26,8 @@ export interface CatalogFilters {
   /** Minimum average score (0–100). */
   minScore?: number;
   search?: string;
+  /** Include titles AniList marks as adult (18+). */
+  adult?: boolean;
 }
 
 export interface CatalogItem extends AniMedia {
@@ -106,6 +108,7 @@ export interface LetterIndex {
 }
 
 const STATIC_INDEX = catalogIndex.streams as LetterIndex[];
+const STATIC_INDEX_ADULT = (catalogIndex as { adultStreams?: LetterIndex[] }).adultStreams ?? [];
 
 export const isUnfiltered = (f: CatalogFilters) =>
   !f.genres.length && !f.format && !f.status && !f.season && !f.year && !f.minScore && !f.search?.trim();
@@ -208,7 +211,7 @@ export class CatalogCursor {
     readonly filters: CatalogFilters,
     readonly sort: CatalogSort,
     ranges: PopRange[] = STATIC_RANGES,
-    index: (LetterIndex | undefined)[] = ranges === STATIC_RANGES ? STATIC_INDEX : [],
+    index: (LetterIndex | undefined)[] = ranges === STATIC_RANGES ? (filters.adult ? STATIC_INDEX_ADULT : STATIC_INDEX) : [],
   ) {
     this.streams = ranges.map((range) => ({ range, page: 0, buffer: [], done: false }));
     this.index = index;
@@ -377,12 +380,13 @@ const ENUMS = {
   season: ['WINTER', 'SPRING', 'SUMMER', 'FALL'],
 };
 
-const FULL_FIELDS = `id title { romaji english native } coverImage { large extraLarge color } bannerImage format episodes duration genres season seasonYear status averageScore popularity trending startDate { year month day } nextAiringEpisode { airingAt episode }`;
+const FULL_FIELDS = `id title { romaji english native } coverImage { large extraLarge color } bannerImage format episodes duration genres isAdult season seasonYear status averageScore popularity trending startDate { year month day } nextAiringEpisode { airingAt episode }`;
 const LIGHT_FIELDS = `id title { romaji } genres popularity`;
 
 /** GraphQL arguments for the filters. Strings are JSON-encoded, enums whitelisted. */
 export function filterArgs(f: CatalogFilters, sort: CatalogSort, range: PopRange): string {
-  const args = ['type: ANIME', 'isAdult: false', `sort: [${SERVER_SORT[sort].join(', ')}]`];
+  const args = ['type: ANIME', `sort: [${SERVER_SORT[sort].join(', ')}]`];
+  if (!f.adult) args.push('isAdult: false');
   // The first genre narrows the query; further genres are checked locally (AniList's genre_in means "any of").
   if (f.genres[0]) args.push(`genre: ${JSON.stringify(f.genres[0])}`);
   if (f.format && ENUMS.format.includes(f.format)) args.push(`format: ${f.format}`);

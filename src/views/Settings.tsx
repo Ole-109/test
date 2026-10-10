@@ -116,6 +116,12 @@ export function Settings() {
             options={(['romaji', 'english', 'native'] as TitleLang[]).map((v) => ({ value: v, label: t(`settings.titleLang.${v}`) }))}
           />
         </Field>
+        <Switch
+          checked={settings.showAdult}
+          onChange={(v) => setSetting('showAdult', v)}
+          label={t('settings.showAdult')}
+          description={t('settings.showAdultHint')}
+        />
       </section>
 
       <section className="card settings-section" aria-labelledby="set-data">

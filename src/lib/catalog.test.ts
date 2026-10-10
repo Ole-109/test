@@ -142,7 +142,7 @@ describe('catalog cursor', () => {
     await c.jumpTo('K');
     const rest = await drain(c);
     expect(rest[0].title.romaji.toLowerCase().startsWith('k')).toBe(true);
-    expect(rest).toHaveLength(DATA.filter((m) => compareTitles(m.title.romaji, 'k￿') <= 0).length);
+    expect(rest).toHaveLength(DATA.filter((m) => compareTitles(m.title.romaji, 'k\uffff') <= 0).length);
   });
 });
 
@@ -221,6 +221,12 @@ describe('filter arguments', () => {
     expect(args).toContain('averageScore_greater: 69');
     expect(args).toContain('popularity_greater: 49, popularity_lesser: 300');
     expect(args).toContain('sort: [TITLE_ROMAJI, ID]');
+    expect(args).toContain('isAdult: false');
+  });
+
+  it('includes 18+ titles only when asked to', () => {
+    expect(filterArgs({ genres: [], adult: true }, 'az', null)).not.toContain('isAdult');
+    expect(filterArgs({ genres: [] }, 'az', null)).toContain('isAdult: false');
   });
 });
 

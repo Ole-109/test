@@ -8,11 +8,12 @@ import { useT } from '../../i18n';
 import { addAnime, mergeSynced } from '../../lib/actions';
 import { AniListError, browseAnime, fetchByIds, mediaFields, searchAnime, type AniMedia, type BrowseMode } from '../../lib/anilist';
 import { useDebounced } from '../../lib/hooks';
+import { setSetting } from '../../lib/actions';
 import { useStore } from '../../lib/store';
 import type { AnimeStatus } from '../../lib/types';
 import { AnimeSheet } from './AnimeSheet';
 import { Catalog } from './Catalog';
-import { airLabel, genreLabel, GENRES, metaLine } from './labels';
+import { airLabel, genreLabel, genresFor, metaLine } from './labels';
 import { MediaCard, mediaTitle } from './MediaCard';
 
 const cache = new Map<string, AniMedia[]>();
@@ -33,6 +34,7 @@ export function Discover() {
   const t = useT();
   const titleLang = useStore((s) => s.settings.titleLang);
   const anime = useStore((s) => s.anime);
+  const showAdult = useStore((s) => s.settings.showAdult);
   const [mode, setModeState] = useState<Mode>(() => {
     try {
       const v = sessionStorage.getItem(MODE_KEY);
@@ -61,7 +63,7 @@ export function Discover() {
   });
   const [genre, setGenre] = useState('');
   const dq = useDebounced(q.trim(), 350);
-  const key = all ? '' : `${dq ? `q:${dq.toLowerCase()}` : `m:${mode}`}|${genre}`;
+  const key = all ? '' : `${dq ? `q:${dq.toLowerCase()}` : `m:${mode}`}|${genre}|${showAdult ? 18 : 0}`;
   const [results, setResults] = useState<AniMedia[] | null>(() => cache.get(key) ?? null);
   const [error, setError] = useState<'network' | 'rate' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,7 +83,7 @@ export function Discover() {
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
-    (dq ? searchAnime(dq, ctrl.signal, genre) : browseAnime(mode as BrowseMode, ctrl.signal, genre))
+    (dq ? searchAnime(dq, ctrl.signal, genre, showAdult) : browseAnime(mode as BrowseMode, ctrl.signal, genre, showAdult))
       .then((r) => {
         cache.set(key, r);
         setResults(r);
@@ -92,7 +94,7 @@ export function Discover() {
       })
       .finally(() => !ctrl.signal.aborted && setLoading(false));
     return () => ctrl.abort();
-  }, [key, dq, mode, genre, retry, all]);
+  }, [key, dq, mode, genre, retry, all, showAdult]);
 
   // Catalog results come without descriptions (smaller requests): load it for the preview.
   useEffect(() => {
@@ -162,21 +164,33 @@ export function Discover() {
             ]}
           />
         )}
-        {!all && (
-          <select className="select" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label={t('anime.category')}>
-            <option value="">{t('anime.allGenres')}</option>
-            {GENRES.map((g) => (
-              <option key={g} value={g}>
-                {genreLabel(t, g)}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="discover-row">
+          {!all && (
+            <select className="select" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label={t('anime.category')}>
+              <option value="">{t('anime.allGenres')}</option>
+              {genresFor(showAdult).map((g) => (
+                <option key={g} value={g}>
+                  {genreLabel(t, g)}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            className={`cat-chip adult-toggle ${showAdult ? 'is-on' : ''}`}
+            aria-pressed={showAdult}
+            title={t('settings.showAdultHint')}
+            onClick={() => setSetting('showAdult', !showAdult)}
+          >
+            18+
+          </button>
+        </div>
       </div>
 
       {all ? (
         <Catalog
           query={dq}
+          adult={showAdult}
           titleLang={titleLang}
           owned={byAniList}
           onOpenOwned={setOpenId}

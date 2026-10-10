@@ -226,6 +226,8 @@ export interface Settings {
   sidebarCollapsed: boolean;
   /** Optional CORS proxy for importing wishes from a URL (see tools/proxy). */
   proxyUrl: string;
+  /** Include titles AniList marks as adult (18+) in Discover. */
+  showAdult: boolean;
 }
 
 export interface ResinState {
