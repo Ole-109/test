@@ -263,7 +263,7 @@ export const en = {
   'anime.sort.added': 'Date added',
   'anime.view.grid': 'Grid view',
   'anime.view.list': 'List view',
-  'anime.allGenres': 'All genres',
+  'anime.allGenres': 'All categories',
   'anime.emptyTitle': 'Your library is empty',
   'anime.emptyBody': 'Search AniList to add shows with covers, episode counts and airing times – or add one by hand.',
   'anime.emptyFiltered': 'Nothing here matches.',
@@ -648,6 +648,11 @@ export const en = {
   "import.rosterUpdated": "{n} characters added or constellations raised",
   "import.profileUpdated": "Profile updated (AR, World Level, server)",
   "import.dropHintAch": "Achievements: paimon.moe backup or a UIAF file (Snap Hutao, YaeAchievement, Cocogoat, …)",
+  "anime.category": "Category",
+  "anime.format": "Format",
+  "anime.allFormats": "All formats",
+  "anime.clearCategories": "Clear",
+  "anime.resetFilters": "Reset filters",
 } as const;
 
 export type MessageKey = keyof typeof en;

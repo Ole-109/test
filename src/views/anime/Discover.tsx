@@ -12,7 +12,7 @@ import { useDebounced } from '../../lib/hooks';
 import { useStore } from '../../lib/store';
 import type { AnimeStatus } from '../../lib/types';
 import { AnimeSheet } from './AnimeSheet';
-import { airLabel, metaLine } from './labels';
+import { airLabel, genreLabel, GENRES, metaLine } from './labels';
 
 const cache = new Map<string, AniMedia[]>();
 const QUERY_KEY = 'waypoint:discoverQuery';
@@ -44,8 +44,9 @@ export function Discover() {
       return '';
     }
   });
+  const [genre, setGenre] = useState('');
   const dq = useDebounced(q.trim(), 350);
-  const key = dq ? `q:${dq.toLowerCase()}` : `m:${mode}`;
+  const key = `${dq ? `q:${dq.toLowerCase()}` : `m:${mode}`}|${genre}`;
   const [results, setResults] = useState<AniMedia[] | null>(() => cache.get(key) ?? null);
   const [error, setError] = useState<'network' | 'rate' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,7 +65,7 @@ export function Discover() {
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
-    (dq ? searchAnime(dq, ctrl.signal) : browseAnime(mode, ctrl.signal))
+    (dq ? searchAnime(dq, ctrl.signal, genre) : browseAnime(mode, ctrl.signal, genre))
       .then((r) => {
         cache.set(key, r);
         setResults(r);
@@ -75,7 +76,7 @@ export function Discover() {
       })
       .finally(() => !ctrl.signal.aborted && setLoading(false));
     return () => ctrl.abort();
-  }, [key, dq, mode, retry]);
+  }, [key, dq, mode, genre, retry]);
 
   const byAniList = new Map(anime.filter((a) => a.anilistId).map((a) => [a.anilistId!, a]));
 
@@ -127,6 +128,14 @@ export function Discover() {
             ]}
           />
         )}
+        <select className="select" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label={t('anime.category')}>
+          <option value="">{t('anime.allGenres')}</option>
+          {GENRES.map((g) => (
+            <option key={g} value={g}>
+              {genreLabel(t, g)}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error ? (
@@ -249,7 +258,7 @@ export function Discover() {
             <div className="genres">
               {preview.genres.map((g) => (
                 <span key={g} className="tag">
-                  {g}
+                  {genreLabel(t, g)}
                 </span>
               ))}
             </div>

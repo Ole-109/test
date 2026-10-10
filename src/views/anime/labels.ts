@@ -9,6 +9,42 @@ export const airLabel = (t: T, s?: string) => (s ? (has(`air.${s}`) ? t(`air.${s
 export const seasonLabel = (t: T, s?: string, y?: number) =>
   [s && has(`season.${s}`) ? t(`season.${s}` as MessageKey) : s, y].filter(Boolean).join(' ');
 
+/** AniList's genres (adult genre left out). */
+export const GENRES = [
+  'Action',
+  'Adventure',
+  'Comedy',
+  'Drama',
+  'Ecchi',
+  'Fantasy',
+  'Horror',
+  'Mahou Shoujo',
+  'Mecha',
+  'Music',
+  'Mystery',
+  'Psychological',
+  'Romance',
+  'Sci-Fi',
+  'Slice of Life',
+  'Sports',
+  'Supernatural',
+  'Thriller',
+];
+
+const GENRE_DE: Record<string, string> = {
+  Adventure: 'Abenteuer',
+  Comedy: 'Komödie',
+  Music: 'Musik',
+  Psychological: 'Psychologisch',
+  Romance: 'Romantik',
+  'Sci-Fi': 'Science-Fiction',
+  Sports: 'Sport',
+  Supernatural: 'Übernatürlich',
+};
+
+/** Genre names come from AniList in English; custom genres stay as typed. */
+export const genreLabel = (t: T, g: string) => (t.lang === 'de' ? (GENRE_DE[g] ?? g) : g);
+
 /** "TV · Fall 2026 · 12 ep" style meta line. */
 export function metaLine(t: T, a: Pick<AnimeEntry, 'format' | 'season' | 'year' | 'episodes'>) {
   return [formatLabel(t, a.format), seasonLabel(t, a.season, a.year), a.episodes ? t('anime.eps', { n: a.episodes }) : '']

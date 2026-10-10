@@ -12,7 +12,7 @@ import { useNow } from '../../lib/hooks';
 import { useStore } from '../../lib/store';
 import type { AnimeEntry, AnimeStatus } from '../../lib/types';
 import { useStepWithToast } from './AnimeCard';
-import { airLabel, metaLine } from './labels';
+import { airLabel, genreLabel, metaLine } from './labels';
 
 const DAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -220,7 +220,7 @@ export function AnimeSheet({ id, onClose }: { id: string; onClose: () => void })
           <div className="genres">
             {a.genres.map((g) => (
               <span key={g} className="tag">
-                {g}
+                {genreLabel(t, g)}
               </span>
             ))}
           </div>

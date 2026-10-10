@@ -265,7 +265,7 @@ export const de: Record<MessageKey, string> = {
   'anime.sort.added': 'Hinzugefügt am',
   'anime.view.grid': 'Rasteransicht',
   'anime.view.list': 'Listenansicht',
-  'anime.allGenres': 'Alle Genres',
+  'anime.allGenres': 'Alle Kategorien',
   'anime.emptyTitle': 'Deine Bibliothek ist leer',
   'anime.emptyBody': 'Durchsuche AniList, um Serien mit Covern, Folgenzahl und Sendezeiten hinzuzufügen – oder trage eine selbst ein.',
   'anime.emptyFiltered': 'Hier passt nichts.',
@@ -650,4 +650,9 @@ export const de: Record<MessageKey, string> = {
   "import.rosterUpdated": "{n} Figuren hinzugefügt oder Konstellationen erhöht",
   "import.profileUpdated": "Profil aktualisiert (Abenteuerrang, Weltstufe, Server)",
   "import.dropHintAch": "Erfolge: paimon.moe-Backup oder UIAF-Datei (Snap Hutao, YaeAchievement, Cocogoat, …)",
+  "anime.category": "Kategorie",
+  "anime.format": "Format",
+  "anime.allFormats": "Alle Formate",
+  "anime.clearCategories": "Zurücksetzen",
+  "anime.resetFilters": "Filter zurücksetzen",
 };

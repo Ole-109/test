@@ -1,4 +1,4 @@
-import { Compass, LayoutGrid, List, PenLine, Plus, Search, Tv } from 'lucide-react';
+import { Compass, LayoutGrid, List, PenLine, Plus, Search, Tv, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button, Empty, IconButton, PageHeader } from '../../components/ui';
 import { useT } from '../../i18n';
@@ -10,6 +10,7 @@ import type { AnimeEntry, AnimeStatus } from '../../lib/types';
 import { AnimeCard } from './AnimeCard';
 import { AnimeSheet, ManualAnimeSheet } from './AnimeSheet';
 import { AnimeTabs } from './AnimeTabs';
+import { formatLabel, genreLabel } from './labels';
 
 type Sort = 'updated' | 'title' | 'score' | 'progress' | 'added';
 type Tab = AnimeStatus | 'all';
@@ -23,7 +24,8 @@ export function Library() {
   const titleLang = useStore((s) => s.settings.titleLang);
   const [tab, setTab] = useState<Tab>(() => (anime.some((a) => a.status === 'watching') ? 'watching' : 'all'));
   const [q, setQ] = useState('');
-  const [genre, setGenre] = useState('');
+  const [cats, setCats] = useState<string[]>([]);
+  const [format, setFormat] = useState('');
   const [sort, setSort] = useState<Sort>('updated');
   const [layout, setLayout] = useState<'grid' | 'list'>(() => {
     try {
@@ -41,10 +43,11 @@ export function Library() {
     return c;
   }, [anime]);
 
-  const genres = useMemo(() => [...new Set(anime.flatMap((a) => a.genres))].sort(), [anime]);
+  const formats = useMemo(() => [...new Set(anime.map((a) => a.format).filter((f): f is string => !!f))].sort(), [anime]);
   const episodesWatched = anime.reduce((s, a) => s + a.progress + a.rewatches * (a.episodes ?? 0), 0);
 
-  const list = useMemo(() => {
+  // Everything except the categories, so the chips can show how many shows each one would leave.
+  const base = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const match = (a: AnimeEntry) =>
       !needle ||
@@ -58,7 +61,7 @@ export function Library() {
         (b.episodes ? b.progress / b.episodes : 0) - (a.episodes ? a.progress / a.episodes : 0) || b.updatedAt - a.updatedAt,
     };
     return anime
-      .filter((a) => (tab === 'all' || a.status === tab) && (!genre || a.genres.includes(genre)) && match(a))
+      .filter((a) => (tab === 'all' || a.status === tab) && (!format || a.format === format) && match(a))
       .sort((a, b) => {
         // In "Watching", shows with new episodes come first.
         if (tab === 'watching' && sort === 'updated') {
@@ -67,7 +70,23 @@ export function Library() {
         }
         return cmp[sort](a, b);
       });
-  }, [anime, tab, genre, q, sort, titleLang, now]);
+  }, [anime, tab, format, q, sort, titleLang, now]);
+
+  /** A show must have every selected category. */
+  const list = useMemo(() => (cats.length ? base.filter((a) => cats.every((c) => a.genres.includes(c))) : base), [base, cats]);
+
+  const chips = useMemo(() => {
+    const count = new Map<string, number>();
+    for (const a of list) for (const g of a.genres) count.set(g, (count.get(g) ?? 0) + 1);
+    const all = new Set([...anime.flatMap((a) => a.genres), ...cats]);
+    return [...all]
+      .map((g) => ({ g, n: cats.includes(g) ? list.length : (count.get(g) ?? 0) }))
+      .filter((c) => c.n > 0 || cats.includes(c.g))
+      .sort((a, b) => Number(cats.includes(b.g)) - Number(cats.includes(a.g)) || b.n - a.n || a.g.localeCompare(b.g));
+  }, [anime, list, cats]);
+
+  const toggleCat = (g: string) => setCats((cur) => (cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]));
+  const filtered = cats.length > 0 || !!format || !!q.trim();
 
   const setView = (v: 'grid' | 'list') => {
     setLayout(v);
@@ -139,12 +158,12 @@ export function Library() {
               <Search size={16} aria-hidden />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('anime.search')} aria-label={t('anime.search')} />
             </label>
-            {genres.length > 0 && (
-              <select className="select" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label={t('anime.genres')}>
-                <option value="">{t('anime.allGenres')}</option>
-                {genres.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
+            {formats.length > 1 && (
+              <select className="select" value={format} onChange={(e) => setFormat(e.target.value)} aria-label={t('anime.format')}>
+                <option value="">{t('anime.allFormats')}</option>
+                {formats.map((f) => (
+                  <option key={f} value={f}>
+                    {formatLabel(t, f)}
                   </option>
                 ))}
               </select>
@@ -166,8 +185,44 @@ export function Library() {
             </div>
           </div>
 
+          {chips.length > 0 && (
+            <div className="cat-chips" role="group" aria-label={t('anime.category')}>
+              {chips.map(({ g, n }) => {
+                const on = cats.includes(g);
+                return (
+                  <button key={g} type="button" className={`cat-chip ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={() => toggleCat(g)}>
+                    {genreLabel(t, g)}
+                    <span className="cat-chip-n num">{n}</span>
+                  </button>
+                );
+              })}
+              {cats.length > 0 && (
+                <button type="button" className="cat-chip cat-chip-clear" onClick={() => setCats([])}>
+                  <X size={13} aria-hidden />
+                  {t('anime.clearCategories')}
+                </button>
+              )}
+            </div>
+          )}
+
           {list.length === 0 ? (
-            <Empty icon={<Search size={28} />} title={t('anime.emptyFiltered')} />
+            <Empty
+              icon={<Search size={28} />}
+              title={t('anime.emptyFiltered')}
+              action={
+                filtered ? (
+                  <Button
+                    onClick={() => {
+                      setCats([]);
+                      setFormat('');
+                      setQ('');
+                    }}
+                  >
+                    {t('anime.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className={layout === 'grid' ? 'anime-grid' : 'anime-list'}>
               {list.map((a) => (

@@ -66,9 +66,10 @@ async function query<T>(q: string, variables: Record<string, unknown>, signal?: 
 
 type PageResult = { Page: { media: AniMedia[] } };
 
-export async function searchAnime(search: string, signal?: AbortSignal): Promise<AniMedia[]> {
-  const q = `query ($search: String) { Page(perPage: 24) { media(search: $search, type: ANIME, isAdult: false, sort: SEARCH_MATCH) { ${FIELDS} } } }`;
-  return (await query<PageResult>(q, { search }, signal)).Page.media;
+/** `genre` narrows results to one AniList genre; null/undefined means any. */
+export async function searchAnime(search: string, signal?: AbortSignal, genre?: string): Promise<AniMedia[]> {
+  const q = `query ($search: String, $genre: String) { Page(perPage: 24) { media(search: $search, genre: $genre, type: ANIME, isAdult: false, sort: SEARCH_MATCH) { ${FIELDS} } } }`;
+  return (await query<PageResult>(q, { search, genre: genre || null }, signal)).Page.media;
 }
 
 export type BrowseMode = 'trending' | 'season' | 'popular' | 'upcoming';
@@ -86,15 +87,16 @@ function nextSeason(date = new Date()) {
   return i === 3 ? { season: 'WINTER', year: year + 1 } : { season: order[i + 1], year };
 }
 
-export async function browseAnime(mode: BrowseMode, signal?: AbortSignal): Promise<AniMedia[]> {
+export async function browseAnime(mode: BrowseMode, signal?: AbortSignal, genre?: string): Promise<AniMedia[]> {
+  const g = genre || null;
   if (mode === 'season' || mode === 'upcoming') {
     const { season, year } = mode === 'season' ? currentSeason() : nextSeason();
-    const q = `query ($season: MediaSeason, $year: Int) { Page(perPage: 30) { media(season: $season, seasonYear: $year, type: ANIME, isAdult: false, sort: POPULARITY_DESC) { ${FIELDS} } } }`;
-    return (await query<PageResult>(q, { season, year }, signal)).Page.media;
+    const q = `query ($season: MediaSeason, $year: Int, $genre: String) { Page(perPage: 30) { media(season: $season, seasonYear: $year, genre: $genre, type: ANIME, isAdult: false, sort: POPULARITY_DESC) { ${FIELDS} } } }`;
+    return (await query<PageResult>(q, { season, year, genre: g }, signal)).Page.media;
   }
   const sort = mode === 'trending' ? 'TRENDING_DESC' : 'POPULARITY_DESC';
-  const q = `query ($sort: [MediaSort]) { Page(perPage: 30) { media(type: ANIME, isAdult: false, sort: $sort) { ${FIELDS} } } }`;
-  return (await query<PageResult>(q, { sort: [sort] }, signal)).Page.media;
+  const q = `query ($sort: [MediaSort], $genre: String) { Page(perPage: 30) { media(genre: $genre, type: ANIME, isAdult: false, sort: $sort) { ${FIELDS} } } }`;
+  return (await query<PageResult>(q, { sort: [sort], genre: g }, signal)).Page.media;
 }
 
 export async function fetchByIds(ids: number[]): Promise<AniMedia[]> {

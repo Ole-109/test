@@ -6,6 +6,7 @@ import { useT } from '../../i18n';
 import { STATUSES } from '../../lib/anime';
 import { useStore } from '../../lib/store';
 import { AnimeTabs } from './AnimeTabs';
+import { genreLabel } from './labels';
 
 /** Episodes counted per entry, including rewatches. */
 const watched = (a: { progress: number; rewatches: number; episodes?: number }) => a.progress + a.rewatches * (a.episodes ?? 0);
@@ -33,7 +34,7 @@ export function Stats() {
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-      .map(([g, v]) => ({ key: g, label: g, value: v }));
+      .map(([g, v]) => ({ key: g, label: genreLabel(t, g), value: v }));
     const scores: Datum[] = Array.from({ length: 10 }, (_, i) => ({
       key: String(i + 1),
       label: String(i + 1),

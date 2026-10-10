@@ -2768,3 +2768,51 @@ button.outcome {
   align-items: center;
   gap: 8px 16px;
 }
+
+/* ── Anime categories ──────────────────────────────────────────────── */
+.cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cat-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.cat-chip.is-on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cat-chip-n {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.cat-chip.is-on .cat-chip-n {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.cat-chip-clear {
+  border-style: dashed;
+  color: var(--muted);
+}
