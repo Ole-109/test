@@ -1,5 +1,5 @@
 import { Droplet, Flame, Gem, Leaf, Snowflake, Sparkles, Wind, Zap } from 'lucide-react';
-import { useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { iconUrl } from '../data/characters';
 import type { CharacterDef, Element } from '../lib/types';
 
@@ -123,18 +123,11 @@ export function Cover({
 }
 
 export function Logo({ size = 28 }: { size?: number }) {
-  // Unique gradient id: two logos render at once (sidebar + mobile bar) and one may be hidden.
-  const id = useId();
+  // A fine four-point star in the accent colour.
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="logo">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f3dfb0" />
-          <stop offset="1" stopColor="#c49a53" />
-        </linearGradient>
-      </defs>
-      <path d="M32 4 L38 26 L60 32 L38 38 L32 60 L26 38 L4 32 L26 26 Z" fill={`url(#${id})`} />
-      <circle cx="32" cy="32" r="4.5" fill="var(--bg)" />
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="logo" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinejoin="round">
+      <path d="M32 6 C34 24 40 30 58 32 C40 34 34 40 32 58 C30 40 24 34 6 32 C24 30 30 24 32 6 Z" />
+      <circle cx="32" cy="32" r="3" fill="var(--accent)" stroke="none" />
     </svg>
   );
 }

@@ -2829,16 +2829,51 @@ button.outcome {
   color: var(--muted);
 }
 
-/* ── Display numbers ───────────────────────────────────────────────── */
+/* ── Display numbers: set in the serif ──────────────────────────────── */
 .resin-value strong,
 .banner-sum-pity strong,
 .pity-number strong,
 .chance-value,
 .progress-big strong,
 .stat-tile strong,
+.ach-summary-main,
+.ach-pct {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.resin-value strong {
+  font-size: 40px;
+}
+
+.banner-sum-pity strong {
+  font-size: 32px;
+}
+
+.pity-number strong {
+  font-size: 46px;
+}
+
+.chance-value {
+  font-size: 52px;
+}
+
+.progress-big strong {
+  font-size: 42px;
+}
+
+.stat-tile strong {
+  font-size: 32px;
+}
+
 .ach-summary-main {
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+}
+
+.ach-pct {
+  font-size: 18px;
 }
 
 .ach-wiki {

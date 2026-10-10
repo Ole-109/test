@@ -31,16 +31,16 @@ export interface ShareCardInput {
 const W = 1200;
 const H = 675;
 const C = {
-  bg: '#13151d',
-  surface: '#1b1e29',
-  border: '#282c3a',
-  text: '#e6e7ee',
-  text2: '#adb1c2',
-  muted: '#7c8197',
-  accent: '#efb74a',
-  r5: '#eaa64c',
-  tileA: '#8a5a2b',
-  tileB: '#c08746',
+  bg: '#1a1918',
+  surface: '#232120',
+  border: '#33302c',
+  text: '#ede7de',
+  text2: '#b8afa4',
+  muted: '#8b8379',
+  accent: '#d69c82',
+  r5: '#d9ae74',
+  tileA: '#94704e',
+  tileB: '#c3a07b',
 };
 
 function loadImage(src: string, timeout = 5000): Promise<HTMLImageElement | null> {
@@ -84,17 +84,18 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
   const ctx = canvas.getContext('2d')!;
   await document.fonts?.ready;
   const font = (weight: number, size: number) => `${weight} ${size}px Inter, "Segoe UI", system-ui, sans-serif`;
+  const serif = (size: number) => `400 ${size}px "Instrument Serif", Georgia, serif`;
 
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, W, H);
 
   // Header
   ctx.fillStyle = C.accent;
-  ctx.font = font(700, 16);
-  ctx.fillText('✦ WAYPOINT', 48, 58);
+  ctx.font = serif(22);
+  ctx.fillText('Waypoint', 48, 58);
   ctx.fillStyle = C.text;
-  ctx.font = font(700, 34);
-  ctx.fillText(fit(ctx, input.title, 760), 48, 102);
+  ctx.font = serif(44);
+  ctx.fillText(fit(ctx, input.title, 760), 48, 104);
   ctx.fillStyle = C.muted;
   ctx.font = font(500, 17);
   ctx.fillText(fit(ctx, input.subtitle, 760), 48, 132);
@@ -113,8 +114,8 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
     ctx.font = font(500, 15);
     ctx.fillText(fit(ctx, s.label, tileW - 32), x + 16, y + 30);
     ctx.fillStyle = C.text;
-    ctx.font = font(700, 34);
-    ctx.fillText(fit(ctx, s.value, tileW - 32), x + 16, y + 70);
+    ctx.font = serif(42);
+    ctx.fillText(fit(ctx, s.value, tileW - 32), x + 16, y + 72);
     if (s.sub) {
       ctx.fillStyle = C.text2;
       ctx.font = font(500, 14);
