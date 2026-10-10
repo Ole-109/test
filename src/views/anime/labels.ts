@@ -47,7 +47,7 @@ export const genreLabel = (t: T, g: string) => (t.lang === 'de' ? (GENRE_DE[g] ?
 
 /** "TV · Fall 2026 · 12 ep" style meta line. */
 export function metaLine(t: T, a: Pick<AnimeEntry, 'format' | 'season' | 'year' | 'episodes'>) {
-  return [formatLabel(t, a.format), seasonLabel(t, a.season, a.year), a.episodes ? t('anime.eps', { n: a.episodes }) : '']
+  return [formatLabel(t, a.format), seasonLabel(t, a.season, a.year), a.episodes ? t.n('anime.eps', a.episodes) : '']
     .filter(Boolean)
     .join(' · ');
 }

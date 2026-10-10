@@ -22,7 +22,11 @@ data out of the game and HoYoverse services. English and German UI.
 - **Today**: live Original Resin, daily/weekly/monthly routine with correct 04:00 server resets, cooldowns.
 - **Planner**: chance to get a featured 5★ (C0–C6 / R1–R5) from your savings, current pity and guarantee.
 
-**Anime**: library with one-tap episode progress, AniList search, weekly airing schedule, stats.
+**Anime**: library with one-tap episode progress and category filters, weekly airing schedule, stats, and
+Discover for AniList: trending, seasons, search, and **All anime** – the complete AniList catalog (~21k titles)
+from A to Z (or by popularity, score, newest) with category, format, status, year, season and score filters,
+an A–Z jump bar and endless scrolling. AniList only pages through 5,000 results per query, so the catalog is
+read as several popularity ranges in one request and merged in order (`src/lib/catalog.ts`).
 
 No account, no server: data stays in your browser (`localStorage`). Back up or move it via Settings.
 
@@ -84,6 +88,7 @@ npm run typecheck    # app + build config + CLI
 npm run build        # static site in dist/
 npm run build:cli    # tools/dist/waypoint-export.mjs
 npm run sync-data    # refresh characters/weapons/materials/achievements from gi.yatta.moe
+npm run sync-anilist # refresh the A–Z jump index of the AniList catalog (a few minutes)
 ```
 
 Game data and icons come from [Project Amber](https://gi.yatta.moe) (icons are linked, not bundled).

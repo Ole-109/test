@@ -1,21 +1,24 @@
-import { Check, ChevronDown, Compass, Plus, Search, Star, WifiOff, X } from 'lucide-react';
+import { Compass, Plus, Search, WifiOff, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from '../../components/Sheet';
 import { toast } from '../../components/toast';
 import { Button, Empty, PageHeader, Segmented } from '../../components/ui';
 import { Cover } from '../../components/visuals';
 import { useT } from '../../i18n';
-import { addAnime } from '../../lib/actions';
-import { AniListError, browseAnime, mediaFields, searchAnime, type AniMedia, type BrowseMode } from '../../lib/anilist';
-import { STATUSES } from '../../lib/anime';
+import { addAnime, mergeSynced } from '../../lib/actions';
+import { AniListError, browseAnime, fetchByIds, mediaFields, searchAnime, type AniMedia, type BrowseMode } from '../../lib/anilist';
 import { useDebounced } from '../../lib/hooks';
 import { useStore } from '../../lib/store';
 import type { AnimeStatus } from '../../lib/types';
 import { AnimeSheet } from './AnimeSheet';
+import { Catalog } from './Catalog';
 import { airLabel, genreLabel, GENRES, metaLine } from './labels';
+import { MediaCard, mediaTitle } from './MediaCard';
 
 const cache = new Map<string, AniMedia[]>();
 const QUERY_KEY = 'waypoint:discoverQuery';
+const MODE_KEY = 'waypoint:discoverMode';
+type Mode = BrowseMode | 'all';
 
 /** Lets other parts of the app (command palette) open Discover with a query. */
 export function presetDiscoverQuery(q: string) {
@@ -26,15 +29,27 @@ export function presetDiscoverQuery(q: string) {
   }
 }
 
-function mediaTitle(m: AniMedia, pref: string) {
-  return (pref === 'english' ? m.title.english : pref === 'native' ? m.title.native : null) || m.title.romaji;
-}
-
 export function Discover() {
   const t = useT();
   const titleLang = useStore((s) => s.settings.titleLang);
   const anime = useStore((s) => s.anime);
-  const [mode, setMode] = useState<BrowseMode>('trending');
+  const [mode, setModeState] = useState<Mode>(() => {
+    try {
+      const v = sessionStorage.getItem(MODE_KEY);
+      return v === 'season' || v === 'upcoming' || v === 'popular' || v === 'all' ? v : 'trending';
+    } catch {
+      return 'trending';
+    }
+  });
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    try {
+      sessionStorage.setItem(MODE_KEY, m);
+    } catch {
+      /* private mode */
+    }
+  };
+  const all = mode === 'all';
   const [q, setQ] = useState(() => {
     try {
       const v = sessionStorage.getItem(QUERY_KEY) ?? '';
@@ -46,7 +61,7 @@ export function Discover() {
   });
   const [genre, setGenre] = useState('');
   const dq = useDebounced(q.trim(), 350);
-  const key = `${dq ? `q:${dq.toLowerCase()}` : `m:${mode}`}|${genre}`;
+  const key = all ? '' : `${dq ? `q:${dq.toLowerCase()}` : `m:${mode}`}|${genre}`;
   const [results, setResults] = useState<AniMedia[] | null>(() => cache.get(key) ?? null);
   const [error, setError] = useState<'network' | 'rate' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,6 +71,7 @@ export function Discover() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (all) return;
     const hit = cache.get(key);
     if (hit) {
       setResults(hit);
@@ -65,7 +81,7 @@ export function Discover() {
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
-    (dq ? searchAnime(dq, ctrl.signal, genre) : browseAnime(mode, ctrl.signal, genre))
+    (dq ? searchAnime(dq, ctrl.signal, genre) : browseAnime(mode as BrowseMode, ctrl.signal, genre))
       .then((r) => {
         cache.set(key, r);
         setResults(r);
@@ -76,7 +92,19 @@ export function Discover() {
       })
       .finally(() => !ctrl.signal.aborted && setLoading(false));
     return () => ctrl.abort();
-  }, [key, dq, mode, genre, retry]);
+  }, [key, dq, mode, genre, retry, all]);
+
+  // Catalog results come without descriptions (smaller requests): load it for the preview.
+  useEffect(() => {
+    if (!preview || preview.description !== undefined) return;
+    let alive = true;
+    fetchByIds([preview.id])
+      .then(([full]) => alive && full && setPreview((cur) => (cur?.id === full.id ? { ...cur, ...full } : cur)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [preview]);
 
   const byAniList = new Map(anime.filter((a) => a.anilistId).map((a) => [a.anilistId!, a]));
 
@@ -86,6 +114,11 @@ export function Discover() {
       return;
     }
     const e = addAnime({ ...mediaFields(m), title: mediaFields(m).title! }, status);
+    // Fill in the synopsis for entries added from the catalog.
+    if (m.description === undefined)
+      fetchByIds([m.id])
+        .then((media) => mergeSynced(new Map(media.map((x) => [x.id, mediaFields(x)]))))
+        .catch(() => {});
     toast({
       message: t('anime.added', { name: mediaTitle(m, titleLang), status: t(`anime.status.${status}`) }),
       tone: 'success',
@@ -115,7 +148,7 @@ export function Discover() {
             </button>
           )}
         </label>
-        {!dq && (
+        {(!dq || all) && (
           <Segmented
             label={t('discover.title')}
             value={mode}
@@ -125,20 +158,32 @@ export function Discover() {
               { value: 'season', label: t('discover.season') },
               { value: 'upcoming', label: t('discover.upcoming') },
               { value: 'popular', label: t('discover.popular') },
+              { value: 'all', label: t('catalog.tab') },
             ]}
           />
         )}
-        <select className="select" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label={t('anime.category')}>
-          <option value="">{t('anime.allGenres')}</option>
-          {GENRES.map((g) => (
-            <option key={g} value={g}>
-              {genreLabel(t, g)}
-            </option>
-          ))}
-        </select>
+        {!all && (
+          <select className="select" value={genre} onChange={(e) => setGenre(e.target.value)} aria-label={t('anime.category')}>
+            <option value="">{t('anime.allGenres')}</option>
+            {GENRES.map((g) => (
+              <option key={g} value={g}>
+                {genreLabel(t, g)}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {error ? (
+      {all ? (
+        <Catalog
+          query={dq}
+          titleLang={titleLang}
+          owned={byAniList}
+          onOpenOwned={setOpenId}
+          onPreview={setPreview}
+          onAdd={add}
+        />
+      ) : error ? (
         <Empty
           icon={<WifiOff size={28} />}
           title={error === 'rate' ? t('discover.rate') : t('discover.error')}
@@ -156,36 +201,15 @@ export function Discover() {
         <div className={`discover-grid ${loading ? 'is-loading' : ''}`}>
           {results?.map((m) => {
             const owned = byAniList.get(m.id);
-            const title = mediaTitle(m, titleLang);
             return (
-              <article key={m.id} className="media-card">
-                <button type="button" className="media-open" onClick={() => (owned ? setOpenId(owned.id) : setPreview(m))} aria-label={title}>
-                  <Cover src={m.coverImage.extraLarge ?? m.coverImage.large ?? undefined} title={title} color={m.coverImage.color ?? undefined} />
-                  {m.averageScore != null && (
-                    <span className="media-score">
-                      <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden /> {m.averageScore}%
-                    </span>
-                  )}
-                  <div className="media-info">
-                    <h3 title={title}>{title}</h3>
-                    <p className="muted small">
-                      {metaLine(t, {
-                        format: m.format ?? undefined,
-                        season: m.season ?? undefined,
-                        year: m.seasonYear ?? undefined,
-                        episodes: m.episodes ?? undefined,
-                      })}
-                    </p>
-                  </div>
-                </button>
-                {owned ? (
-                  <span className="media-owned">
-                    <Check size={14} /> {t('discover.inLibrary')}
-                  </span>
-                ) : (
-                  <AddMenu onAdd={(s) => add(m, s)} />
-                )}
-              </article>
+              <MediaCard
+                key={m.id}
+                m={m}
+                title={mediaTitle(m, titleLang)}
+                owned={!!owned}
+                onOpen={() => (owned ? setOpenId(owned.id) : setPreview(m))}
+                onAdd={(st) => add(m, st)}
+              />
             );
           })}
         </div>
@@ -271,46 +295,3 @@ export function Discover() {
   );
 }
 
-function AddMenu({ onAdd }: { onAdd: (s: AnimeStatus) => void }) {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [open]);
-  return (
-    <div className="add-menu" ref={ref}>
-      <button type="button" className="add-main" onClick={() => onAdd('planning')}>
-        <Plus size={14} /> {t('anime.status.planning')}
-      </button>
-      <button type="button" className="add-more" aria-label={t('discover.addAs')} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)}>
-        <ChevronDown size={14} />
-      </button>
-      {open && (
-        <div className="menu" role="menu">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onAdd(s);
-                setOpen(false);
-              }}
-            >
-              <span className={`status-dot st-${s}`} aria-hidden /> {t(`anime.status.${s}`)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
