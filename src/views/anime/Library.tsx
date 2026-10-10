@@ -1,8 +1,8 @@
-import { Compass, LayoutGrid, List, PenLine, Plus, Search, Tv, X } from 'lucide-react';
+import { Compass, LayoutGrid, List, PenLine, Plus, Search, StarOff, Tv, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button, Empty, IconButton, PageHeader } from '../../components/ui';
 import { useT } from '../../i18n';
-import { behindBy, displayTitle, STATUSES } from '../../lib/anime';
+import { behindBy, displayTitle, isUnrated, STATUSES } from '../../lib/anime';
 import { useNow } from '../../lib/hooks';
 import { navigate } from '../../lib/router';
 import { useStore } from '../../lib/store';
@@ -26,6 +26,7 @@ export function Library() {
   const [q, setQ] = useState('');
   const [cats, setCats] = useState<string[]>([]);
   const [format, setFormat] = useState('');
+  const [unrated, setUnrated] = useState(false);
   const [sort, setSort] = useState<Sort>('updated');
   const [layout, setLayout] = useState<'grid' | 'list'>(() => {
     try {
@@ -61,7 +62,7 @@ export function Library() {
         (b.episodes ? b.progress / b.episodes : 0) - (a.episodes ? a.progress / a.episodes : 0) || b.updatedAt - a.updatedAt,
     };
     return anime
-      .filter((a) => (tab === 'all' || a.status === tab) && (!format || a.format === format) && match(a))
+      .filter((a) => (tab === 'all' || a.status === tab) && (!format || a.format === format) && (!unrated || isUnrated(a)) && match(a))
       .sort((a, b) => {
         // In "Watching", shows with new episodes come first.
         if (tab === 'watching' && sort === 'updated') {
@@ -70,7 +71,9 @@ export function Library() {
         }
         return cmp[sort](a, b);
       });
-  }, [anime, tab, format, q, sort, titleLang, now]);
+  }, [anime, tab, format, unrated, q, sort, titleLang, now]);
+
+  const unratedCount = useMemo(() => anime.filter((a) => (tab === 'all' || a.status === tab) && isUnrated(a)).length, [anime, tab]);
 
   /** A show must have every selected category. */
   const list = useMemo(() => (cats.length ? base.filter((a) => cats.every((c) => a.genres.includes(c))) : base), [base, cats]);
@@ -86,7 +89,7 @@ export function Library() {
   }, [anime, list, cats]);
 
   const toggleCat = (g: string) => setCats((cur) => (cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]));
-  const filtered = cats.length > 0 || !!format || !!q.trim();
+  const filtered = cats.length > 0 || !!format || unrated || !!q.trim();
 
   const setView = (v: 'grid' | 'list') => {
     setLayout(v);
@@ -158,6 +161,19 @@ export function Library() {
               <Search size={16} aria-hidden />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('anime.search')} aria-label={t('anime.search')} />
             </label>
+            {(unratedCount > 0 || unrated) && (
+              <button
+                type="button"
+                className={`cat-chip unrated-toggle ${unrated ? 'is-on' : ''}`}
+                aria-pressed={unrated}
+                title={t('anime.unratedHint')}
+                onClick={() => setUnrated((u) => !u)}
+              >
+                <StarOff size={13} aria-hidden />
+                {t('anime.unrated')}
+                <span className="cat-chip-n num">{unratedCount}</span>
+              </button>
+            )}
             {formats.length > 1 && (
               <select className="select" value={format} onChange={(e) => setFormat(e.target.value)} aria-label={t('anime.format')}>
                 <option value="">{t('anime.allFormats')}</option>
@@ -215,6 +231,7 @@ export function Library() {
                     onClick={() => {
                       setCats([]);
                       setFormat('');
+                      setUnrated(false);
                       setQ('');
                     }}
                   >
@@ -226,7 +243,7 @@ export function Library() {
           ) : (
             <div className={layout === 'grid' ? 'anime-grid' : 'anime-list'}>
               {list.map((a) => (
-                <AnimeCard key={a.id} a={a} now={now} layout={layout} onOpen={() => setOpenId(a.id)} />
+                <AnimeCard key={a.id} a={a} now={now} layout={layout} quickRate={unrated} onOpen={() => setOpenId(a.id)} />
               ))}
             </div>
           )}

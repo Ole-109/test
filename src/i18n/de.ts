@@ -686,4 +686,8 @@ export const de: Record<MessageKey, string> = {
   "catalog.more": "Mehr laden",
   "settings.showAdult": "18+-Anime anzeigen",
   "settings.showAdultHint": "Zeigt in „Entdecken“ und im gesamten Katalog auch Titel, die AniList als nicht jugendfrei markiert, z. B. Yosuga no Sora. Standardmäßig aus.",
+  "anime.unrated": "Unbewertet",
+  "anime.unratedHint": "Gesehene Serien ohne deine Bewertung – direkt in der Liste bewerten",
+  "anime.rateQuick": "Bewerten",
+  "anime.rated": "{name}: {n}/10",
 };

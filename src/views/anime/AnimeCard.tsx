@@ -1,6 +1,6 @@
 import { Clock, Heart, Plus, Star } from 'lucide-react';
 import { useT } from '../../i18n';
-import { stepEpisode } from '../../lib/actions';
+import { patchAnime, stepEpisode } from '../../lib/actions';
 import { behindBy, displayTitle, projectedAiring } from '../../lib/anime';
 import { useStore } from '../../lib/store';
 import { formatDuration } from '../../lib/time';
@@ -21,7 +21,46 @@ export function useStepWithToast() {
   };
 }
 
-export function AnimeCard({ a, now, onOpen, layout }: { a: AnimeEntry; now: number; onOpen: () => void; layout: 'grid' | 'list' }) {
+/** 1–10 buttons to score a show right from the list. */
+function QuickRate({ a, title }: { a: AnimeEntry; title: string }) {
+  const t = useT();
+  return (
+    <div className="quick-rate" role="group" aria-label={`${t('anime.rateQuick')}: ${title}`}>
+      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+        <button
+          key={n}
+          type="button"
+          title={`${n}/10`}
+          onClick={() => {
+            patchAnime(a.id, { score: n });
+            toast({
+              message: t('anime.rated', { name: title, n }),
+              tone: 'success',
+              action: { label: t('common.undo'), run: () => patchAnime(a.id, { score: 0 }) },
+            });
+          }}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function AnimeCard({
+  a,
+  now,
+  onOpen,
+  layout,
+  quickRate,
+}: {
+  a: AnimeEntry;
+  now: number;
+  onOpen: () => void;
+  layout: 'grid' | 'list';
+  /** Show the 1–10 rating strip (used by the "Unrated" filter). */
+  quickRate?: boolean;
+}) {
   const t = useT();
   const titleLang = useStore((s) => s.settings.titleLang);
   const step = useStepWithToast();
@@ -79,7 +118,8 @@ export function AnimeCard({ a, now, onOpen, layout }: { a: AnimeEntry; now: numb
           )}
         </div>
       </button>
-      {showStep && (
+      {quickRate && <QuickRate a={a} title={title} />}
+      {showStep && !quickRate && (
         <button type="button" className="step-btn" onClick={() => step(a, 1)} aria-label={`${t('anime.plusOne')}: ${title}`} title={t('anime.plusOne')}>
           <Plus size={16} strokeWidth={2.5} />
           <span className="num">{a.progress + 1}</span>

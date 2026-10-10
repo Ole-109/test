@@ -684,6 +684,10 @@ export const en = {
   "catalog.more": "Load more",
   "settings.showAdult": "Show 18+ anime",
   "settings.showAdultHint": "Includes titles AniList marks as adult, such as Yosuga no Sora, in Discover and the full catalog. Off by default.",
+  "anime.unrated": "Unrated",
+  "anime.unratedHint": "Watched shows you haven't scored yet – rate them right from the list",
+  "anime.rateQuick": "Rate",
+  "anime.rated": "{name}: {n}/10",
 } as const;
 
 export type MessageKey = keyof typeof en;

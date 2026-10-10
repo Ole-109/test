@@ -2986,3 +2986,66 @@ button.outcome {
   font-size: 11px;
   font-weight: 700;
 }
+
+/* ── Unrated filter / quick rating ─────────────────────────────────── */
+.unrated-toggle svg {
+  flex: none;
+}
+
+.quick-rate {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.quick-rate button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  background: var(--input-bg);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-rate button:hover,
+.quick-rate button:focus-visible {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: var(--accent-ink);
+}
+
+/* Hovering a score lights up everything up to it. */
+.quick-rate:hover button {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.quick-rate button:hover ~ button {
+  background: var(--input-bg);
+  border-color: var(--border-strong);
+  color: var(--text-2);
+}
+
+.quick-rate button:hover {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+
+.layout-list .quick-rate {
+  flex: none;
+  width: 260px;
+  margin: 0 0 0 auto;
+}
+
+@media (max-width: 600px) {
+  .layout-list .quick-rate {
+    width: 100%;
+  }
+}

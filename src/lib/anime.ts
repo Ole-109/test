@@ -97,3 +97,6 @@ export function withStatus(a: AnimeEntry, status: AnimeStatus, now = Date.now())
   if (status === 'watching' && !a.startedAt) next.startedAt = now;
   return next;
 }
+
+/** Watched (finished or at least one episode seen) but not scored yet. */
+export const isUnrated = (a: Pick<AnimeEntry, 'score' | 'status' | 'progress'>) => a.score === 0 && (a.status === 'completed' || a.progress > 0);

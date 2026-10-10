@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { airedEpisodes, behindBy, occurrences, projectedAiring, withProgress, withStatus } from './anime';
+import { airedEpisodes, behindBy, isUnrated, occurrences, projectedAiring, withProgress, withStatus } from './anime';
 import { DAY } from './time';
 import type { AnimeEntry } from './types';
 
@@ -68,5 +68,15 @@ describe('anime helpers', () => {
 
   it('completing fills progress', () => {
     expect(withStatus(entry({ episodes: 24, progress: 3 }), 'completed').progress).toBe(24);
+  });
+});
+
+describe('unrated', () => {
+  it('counts watched shows without a score', () => {
+    expect(isUnrated({ score: 0, status: 'completed', progress: 0 })).toBe(true);
+    expect(isUnrated({ score: 0, status: 'watching', progress: 3 })).toBe(true);
+    expect(isUnrated({ score: 0, status: 'dropped', progress: 1 })).toBe(true);
+    expect(isUnrated({ score: 0, status: 'planning', progress: 0 })).toBe(false);
+    expect(isUnrated({ score: 7, status: 'completed', progress: 12 })).toBe(false);
   });
 });
