@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import data from '../data/achievements.json';
 import { applyImport } from '../lib/importActions';
 import { getState, setState, defaultState } from '../lib/store';
-import { mergeDone, parseUiaf, progressOf, setStepsDone, stepsDone, toUiaf, type Achievement, type AchievementData } from './achievements';
+import { hoyowikiUrl, mergeDone, parseUiaf, progressOf, setStepsDone, stepsDone, toUiaf, type Achievement, type AchievementData } from './achievements';
 import { parseImport, partsOf } from './formats';
 
 const DATA = data as AchievementData;
@@ -41,6 +41,14 @@ describe('achievement data', () => {
     // No raw game markup left in any text.
     const text = JSON.stringify(DATA);
     expect(text).not.toMatch(/\{[FM]#|\{param0\}|<color/);
+  });
+
+  it('links quest achievements to HoYoWiki quest pages', () => {
+    const linked = all.filter((a) => a.wiki);
+    expect(linked.length).toBeGreaterThan(400);
+    expect(linked.every((a) => /^\d+$/.test(a.wiki!) && a.quest)).toBe(true);
+    expect(all.find((a) => a.id === 81010)?.wiki).toBe('5246'); // Break the Sword Cemetery Seal
+    expect(hoyowikiUrl('5246', 'de')).toBe('https://wiki.hoyolab.com/pc/genshin/entry/5246?lang=de-de');
   });
 });
 

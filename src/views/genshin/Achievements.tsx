@@ -1,9 +1,10 @@
-import { Check, Download, Loader2, RotateCcw, Search, Trophy, Upload } from 'lucide-react';
+import { BookOpen, Check, Download, Loader2, RotateCcw, Search, Trophy, Upload } from 'lucide-react';
 import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { toast } from '../../components/toast';
 import { Button, Empty, PageHeader, Ring, Segmented } from '../../components/ui';
 import { iconUrl } from '../../data/characters';
 import {
+  hoyowikiUrl,
   loadAchievements,
   progressOf,
   stepsDone,
@@ -86,7 +87,22 @@ const Row = memo(function Row({ a, n, t, category, completedAt }: { a: Achieveme
           {category && <span className="ach-cat">{category}</span>}
         </div>
         <p className="ach-desc">{desc}</p>
-        {(de ? a.questDe : a.quest) && <p className="ach-quest">{t('ach.quest', { name: (de ? a.questDe : a.quest)! })}</p>}
+        {(de ? a.questDe : a.quest) && (
+          <p className="ach-quest">
+            {t('ach.questLabel')}{' '}
+            {a.wiki ? (
+              <a href={hoyowikiUrl(a.wiki, t.lang)} target="_blank" rel="noreferrer" className="ach-wiki" title={t('ach.wikiTitle')}>
+                {de ? a.questDe : a.quest}
+                <span className="ach-wiki-tag">
+                  <BookOpen size={11} aria-hidden />
+                  HoYoWiki
+                </span>
+              </a>
+            ) : (
+              <span>{de ? a.questDe : a.quest}</span>
+            )}
+          </p>
+        )}
       </div>
       {tiers > 1 && (
         <div className="ach-tiers" role="group" aria-label={title(a, de)}>

@@ -2840,3 +2840,34 @@ button.outcome {
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
+
+.ach-wiki {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.ach-wiki:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ach-wiki-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 17px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ach-wiki:hover .ach-wiki-tag {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}

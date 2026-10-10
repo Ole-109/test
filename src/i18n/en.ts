@@ -612,7 +612,6 @@ export const en = {
   "ach.filter.done": "Done",
   "ach.allVersions": "All versions",
   "ach.versionN": "Version {v}",
-  "ach.quest": "Quest: {name}",
   "ach.tier": "Tier {n}",
   "ach.markDone": "Mark as done",
   "ach.completedOn": "Completed {date}",
@@ -653,6 +652,8 @@ export const en = {
   "anime.allFormats": "All formats",
   "anime.clearCategories": "Clear",
   "anime.resetFilters": "Reset filters",
+  "ach.questLabel": "Quest:",
+  "ach.wikiTitle": "Open the quest walkthrough on HoYoWiki",
 } as const;
 
 export type MessageKey = keyof typeof en;

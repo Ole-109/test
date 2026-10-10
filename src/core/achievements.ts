@@ -23,6 +23,8 @@ export interface Achievement {
   titleDe: string;
   quest?: string;
   questDe?: string;
+  /** HoYoWiki entry page of the quest (HoYoWiki has no achievement pages). */
+  wiki?: string;
   steps: AchievementStep[];
 }
 
@@ -47,6 +49,9 @@ export function loadAchievements(): Promise<AchievementData> {
 }
 
 export type Done = Record<string, number>;
+
+export const hoyowikiUrl = (entry: string, lang: string) =>
+  `https://wiki.hoyolab.com/pc/genshin/entry/${entry}${lang === 'de' ? '?lang=de-de' : ''}`;
 
 export interface Progress {
   steps: number;

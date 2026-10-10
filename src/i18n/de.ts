@@ -614,7 +614,6 @@ export const de: Record<MessageKey, string> = {
   "ach.filter.done": "Erledigt",
   "ach.allVersions": "Alle Versionen",
   "ach.versionN": "Version {v}",
-  "ach.quest": "Auftrag: {name}",
   "ach.tier": "Stufe {n}",
   "ach.markDone": "Als erledigt markieren",
   "ach.completedOn": "Erledigt am {date}",
@@ -655,4 +654,6 @@ export const de: Record<MessageKey, string> = {
   "anime.allFormats": "Alle Formate",
   "anime.clearCategories": "Zurücksetzen",
   "anime.resetFilters": "Filter zurücksetzen",
+  "ach.questLabel": "Auftrag:",
+  "ach.wikiTitle": "Lösungsweg des Auftrags auf HoYoWiki öffnen",
 };
