@@ -220,6 +220,26 @@ var STANDARD_FIVE_STARS = {
   "yumemizuki-mizuki": Date.UTC(2025, 2, 5)
 };
 
+// src/core/achievements.ts
+var isUiaf = (json) => !!json.info && typeof json.info === "object" && "uiaf_version" in json.info && Array.isArray(json.list);
+function parseUiaf(json) {
+  const done = {};
+  for (const e of json.list) {
+    const finished = e.status != null ? e.status >= 2 : (e.timestamp ?? 0) > 0;
+    if (finished && Number.isFinite(e.id)) done[String(e.id)] = (e.timestamp ?? 0) * 1e3;
+  }
+  return done;
+}
+function parsePaimonAchievements(raw) {
+  const done = {};
+  if (!raw || typeof raw !== "object") return done;
+  for (const cat of Object.values(raw)) {
+    if (!cat || typeof cat !== "object") continue;
+    for (const [id, v] of Object.entries(cat)) if (v === true && /^\d+$/.test(id)) done[id] = 0;
+  }
+  return done;
+}
+
 // src/core/wishStats.ts
 var POOL_OF = {
   "100": "beginner",
@@ -238,6 +258,16 @@ function sortRecords(list) {
 }
 
 // src/core/formats.ts
+function partsOf(r) {
+  const parts = [];
+  if (r.wishes?.records.length) parts.push("wishes");
+  if (r.achievements && Object.keys(r.achievements).length) parts.push("achievements");
+  if (r.roster?.length) parts.push("roster");
+  if (r.good) parts.push("good");
+  if (r.account && Object.values(r.account).some((v) => v != null && v !== "") || r.server) parts.push("profile");
+  if (r.realtime) parts.push("realtime");
+  return parts;
+}
 var ImportError = class extends Error {
 };
 var GACHA_TYPES = /* @__PURE__ */ new Set(["100", "200", "301", "400", "302", "500"]);
@@ -321,12 +351,15 @@ var PAIMON_KEYS = {
   "wish-counter-weapon-event": "302",
   "wish-counter-chronicled": "500"
 };
-function parsePaimon(json) {
+var PAIMON_SERVER = { Asia: "asia", China: "asia", America: "america", Europe: "europe" };
+var isPaimonKey = (k) => /^(account\d+-)?(wish-counter-|achievement$|characters$|wish-uid$)/.test(k);
+function paimonWishes(json, prefix) {
   const records = [];
   let seq = 0;
   for (const [key, type] of Object.entries(PAIMON_KEYS)) {
-    const pulls = json[key]?.pulls ?? [];
+    const pulls = json[prefix + key]?.pulls ?? [];
     for (const p of pulls) {
+      if (!p?.id || !p.time) continue;
       const name = p.id.replace(/_/g, " ");
       const kind = p.type === "weapon" ? "weapon" : p.type === "character" ? "character" : itemKind(name);
       const def = kind === "character" ? findCharacter(name) : findWeapon(name);
@@ -342,8 +375,43 @@ function parsePaimon(json) {
       });
     }
   }
-  if (!records.length) throw new ImportError("No wishes found in this paimon.moe backup.");
-  return { kind: "paimon", label: "paimon.moe backup", wishes: { records, uid: json["wish-uid"] || void 0 } };
+  return records;
+}
+function paimonAccount(json, prefix) {
+  const records = paimonWishes(json, prefix);
+  const uid = json[`${prefix}wish-uid`] || void 0;
+  const chars = json[`${prefix}characters`];
+  const roster = chars && typeof chars === "object" && !Array.isArray(chars) ? Object.entries(chars).map(([id, c2]) => ({ name: id.replace(/_/g, " "), copies: (c2?.default ?? 0) + (c2?.wish ?? 0) + (c2?.manual ?? 0) })).filter((c2) => c2.copies > 0) : void 0;
+  const num2 = (v) => v == null || v === "" || !Number.isFinite(Number(v)) ? void 0 : Number(v);
+  const serverName = json[`${prefix}server`];
+  const account = {};
+  if (uid) account.uid = uid;
+  if (num2(json[`${prefix}ar`]) != null) account.level = num2(json[`${prefix}ar`]);
+  if (num2(json[`${prefix}wl`]) != null) account.worldLevel = num2(json[`${prefix}wl`]);
+  if (serverName) account.server = serverName;
+  return {
+    kind: "paimon",
+    label: "paimon.moe backup",
+    wishes: records.length ? { records, uid } : void 0,
+    achievements: parsePaimonAchievements(json[`${prefix}achievement`]),
+    roster: roster?.length ? roster : void 0,
+    account,
+    server: serverName ? PAIMON_SERVER[serverName] : void 0
+  };
+}
+function parsePaimon(json) {
+  const extra = String(json.accounts ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  for (const k of Object.keys(json)) {
+    const m = /^(account\d+)-/.exec(k);
+    if (m && !extra.includes(m[1])) extra.push(m[1]);
+  }
+  const savedAt = typeof json["update-time"] === "string" ? json["update-time"] : void 0;
+  const accounts = [
+    { key: "main", label: "Main", result: paimonAccount(json, "") },
+    ...extra.map((a) => ({ key: a, label: `Account ${a.replace(/^account/, "")}`, result: paimonAccount(json, `${a}-`) }))
+  ].filter((a) => partsOf(a.result).some((p) => p !== "profile")).map((a) => ({ ...a, result: { ...a.result, savedAt } }));
+  if (!accounts.length) throw new ImportError("This paimon.moe backup contains no wishes, achievements or characters.");
+  return { ...accounts[0].result, accounts: accounts.length > 1 ? accounts : void 0 };
 }
 function parseImport(text) {
   let json;
@@ -362,9 +430,14 @@ function parseImport(text) {
     return { kind: "waypoint", label: "Waypoint export", wishes, good: b.good, account: b.account, realtime: b.realtime };
   }
   if (json.format === "GOOD") return { kind: "good", label: `GOOD (${String(json.source ?? "unknown source")})`, good: json };
+  if (isUiaf(json)) {
+    const info = json.info;
+    const at = info.export_timestamp ? new Date(info.export_timestamp * 1e3).toISOString() : void 0;
+    return { kind: "uiaf", label: `UIAF (${info.export_app ?? "unknown app"})`, achievements: parseUiaf(json), savedAt: at };
+  }
   if (Array.isArray(json.hk4e) || json.info && Array.isArray(json.list)) return parseUigf(json);
-  if (Object.keys(PAIMON_KEYS).some((k) => k in json)) return parsePaimon(json);
-  throw new ImportError("Unrecognised file. Supported: Waypoint export, UIGF v3/v4, paimon.moe backup, GOOD.");
+  if (Object.keys(json).some(isPaimonKey)) return parsePaimon(json);
+  throw new ImportError("Unrecognised file. Supported: Waypoint export, UIGF v3/v4, paimon.moe backup, GOOD, UIAF.");
 }
 var isSynthetic = (r) => r.id.startsWith("p");
 var dedupeKey = (r) => `${POOL_OF[r.gachaType]}|${r.time}|${r.name.toLowerCase()}`;

@@ -16,6 +16,7 @@ import {
   Users,
   Package,
   Pickaxe,
+  Trophy,
   Calculator,
   Upload,
 } from 'lucide-react';
@@ -47,6 +48,7 @@ import { PlannerPage } from './views/genshin/Planner';
 import { Import } from './views/genshin/Import';
 import { Inventory } from './views/genshin/Inventory';
 import { Farming } from './views/genshin/Farming';
+import { Achievements } from './views/genshin/Achievements';
 import { Home } from './views/Home';
 import { Settings } from './views/Settings';
 
@@ -59,6 +61,7 @@ const VIEWS: Record<Route, () => ReactNode> = {
   '/teyvat/import': () => <Import />,
   '/teyvat/inventory': () => <Inventory />,
   '/teyvat/farming': () => <Farming />,
+  '/teyvat/achievements': () => <Achievements />,
   '/anime': () => <LibraryView />,
   '/anime/schedule': () => <Schedule />,
   '/anime/stats': () => <Stats />,
@@ -74,6 +77,7 @@ const GO_KEYS: Record<string, Route> = {
   i: '/teyvat/inventory',
   p: '/teyvat/planner',
   f: '/teyvat/farming',
+  v: '/teyvat/achievements',
   a: '/anime',
   s: '/anime/schedule',
   d: '/discover',
@@ -239,6 +243,7 @@ export function App() {
           <NavLink to="/teyvat/characters" icon={<Users size={18} />} label={t('nav.characters')} />
           <NavLink to="/teyvat/inventory" icon={<Package size={18} />} label={t('nav.inventory')} />
           <NavLink to="/teyvat/farming" icon={<Pickaxe size={18} />} label={t('nav.farming')} />
+          <NavLink to="/teyvat/achievements" icon={<Trophy size={18} />} label={t('nav.achievements')} />
           <NavLink to="/teyvat/wishes" icon={<Sparkles size={18} />} label={t('nav.wishes')} />
           <NavLink to="/teyvat/planner" icon={<Calculator size={18} />} label={t('nav.planner')} />
           <NavLink to="/teyvat/import" icon={<Upload size={18} />} label={t('nav.import')} />

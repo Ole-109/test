@@ -1,4 +1,4 @@
-import { Calculator, ListChecks, Package, Pickaxe, Sparkles, Upload, Users } from 'lucide-react';
+import { Calculator, ListChecks, Package, Pickaxe, Sparkles, Trophy, Upload, Users } from 'lucide-react';
 import { SubNav } from '../../components/SubNav';
 import { useT } from '../../i18n';
 
@@ -12,6 +12,7 @@ export function TeyvatTabs() {
         { to: '/teyvat/characters', label: t('nav.characters'), icon: <Users size={16} /> },
         { to: '/teyvat/inventory', label: t('nav.inventory'), icon: <Package size={16} /> },
         { to: '/teyvat/farming', label: t('nav.farming'), icon: <Pickaxe size={16} /> },
+        { to: '/teyvat/achievements', label: t('nav.achievements'), icon: <Trophy size={16} /> },
         { to: '/teyvat/wishes', label: t('nav.wishes'), icon: <Sparkles size={16} /> },
         { to: '/teyvat/planner', label: t('nav.planner'), icon: <Calculator size={16} /> },
         { to: '/teyvat/import', label: t('nav.import'), icon: <Upload size={16} /> },

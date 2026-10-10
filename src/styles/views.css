@@ -2351,3 +2351,420 @@ button.outcome {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ── Achievements ──────────────────────────────────────────────────── */
+.ach-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.ach-summary {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+}
+
+.ach-summary p {
+  margin: 0;
+}
+
+.ach-summary-main {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.ach-summary-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.ach-pct {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ach-reset {
+  margin-left: auto;
+}
+
+.ach-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ach-side {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 24px);
+}
+
+.ach-cats {
+  padding: 4px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+
+.ach-cats ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ach-cat-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ach-cat-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.ach-cat-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.ach-cat-btn img {
+  flex: none;
+  object-fit: contain;
+}
+
+.ach-all {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 12px;
+}
+
+.ach-all svg {
+  color: var(--accent);
+}
+
+.ach-cat-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-cat-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.ach-cat-bar {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.ach-cat-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.ach-cat-bar span.is-full {
+  background: var(--success);
+}
+
+.ach-cat-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ach-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  scroll-margin-top: 12px;
+}
+
+.ach-cat-select {
+  display: none;
+}
+
+.ach-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ach-head .card-title {
+  margin: 0;
+}
+
+.ach-head img {
+  display: inline-block;
+  vertical-align: -3px;
+}
+
+.ach-head > span {
+  white-space: nowrap;
+}
+
+.ach-list {
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ach {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+
+.ach:first-child {
+  border-top: 0;
+}
+
+.ach-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.ach-check:hover {
+  border-color: var(--accent);
+}
+
+.ach.is-done .ach-check {
+  background: var(--success);
+  border-color: var(--success);
+  color: #0d2219;
+}
+
+.ach-partial {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.ach-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.ach-title strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ach.is-done .ach-title strong {
+  color: var(--text-2);
+}
+
+.ach-cat {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ach-desc,
+.ach-quest {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.ach.is-done .ach-desc {
+  color: var(--muted);
+}
+
+.ach-quest {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ach-tiers {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+
+.ach-tiers button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ach-tiers button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ach-tiers button.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.ach.is-done .ach-tiers button.is-on {
+  background: var(--success-soft);
+  border-color: transparent;
+  color: var(--success);
+}
+
+.ach-ver {
+  flex: none;
+  width: 30px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.ach-reward {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 48px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ach.is-done .ach-reward {
+  color: var(--muted);
+}
+
+@media (max-width: 980px) {
+  .ach-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ach-side {
+    display: none;
+  }
+
+  .ach-cat-select {
+    display: block;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .ach {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+
+  .ach-body {
+    flex-basis: calc(100% - 34px);
+  }
+
+  .ach-tiers {
+    margin-left: 34px;
+  }
+
+  .ach-ver {
+    margin-left: auto;
+  }
+}
+
+/* ── Import picker ─────────────────────────────────────────────────── */
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pick-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.pick-item:hover {
+  border-color: var(--border-strong);
+}
+
+.pick-item:has(input:checked) {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.pick-item input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+.pick-item strong {
+  display: block;
+  font-size: 14px;
+}
+
+.pick-item span {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.pick-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}

@@ -1,11 +1,11 @@
 import { Check, Copy, Download, FileUp, Loader2, Square, Trash2, TriangleAlert } from 'lucide-react';
-import { useRef, useState, type DragEvent } from 'react';
+import { useMemo, useRef, useState, type DragEvent } from 'react';
 import { toast } from '../../components/toast';
 import { Button, PageHeader, Segmented } from '../../components/ui';
 import { useT } from '../../i18n';
 import type { MessageKey } from '../../i18n/en';
 import { GachaApiError, type FetchProgress } from '../../core/gachaApi';
-import { ImportError, parseImport, toUigfV4 } from '../../core/formats';
+import { ImportError, parseImport, partsOf, toUigfV4, type ImportPart, type ImportResult } from '../../core/formats';
 import { restore, snapshot } from '../../lib/actions';
 import { applyImport, clearWishes, type ImportSummary } from '../../lib/importActions';
 import { useStore } from '../../lib/store';
@@ -73,6 +73,9 @@ function Summary({ s, label }: { s: ImportSummary; label: string }) {
             <li>{t('import.charsFromWishes', { added: s.fromWishes.added, raised: s.fromWishes.raised })}</li>
           )}
           {(s.weapons > 0 || s.artifacts > 0) && <li>{t('import.gear', { w: s.weapons, a: s.artifacts })}</li>}
+          {s.achievements && <li>{t('import.achievementsAdded', { n: t.num(s.achievements.added), total: t.num(s.achievements.total) })}</li>}
+          {s.roster > 0 && <li>{t('import.rosterUpdated', { n: s.roster })}</li>}
+          {s.profile && <li>{t('import.profileUpdated')}</li>}
           {s.realtime && <li>{t('import.realtime')}</li>}
           {s.unknown.length > 0 && <li className="muted">{t('import.unknown', { list: s.unknown.join(', ') })}</li>}
         </ul>
@@ -86,17 +89,26 @@ function FileDrop({ onResult }: { onResult: (s: ImportSummary, label: string) =>
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ result: ImportResult; file: string } | null>(null);
+
+  const apply = (result: ImportResult, file: string, parts?: ImportPart[]) => {
+    const before = snapshot();
+    const summary = applyImport(result, parts);
+    setPending(null);
+    onResult(summary, `${result.label} · ${file}`);
+    toast({ message: t('import.done'), tone: 'success', action: { label: t('common.undo'), run: () => restore(before) } });
+  };
 
   const handle = async (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
     setError(null);
+    setPending(null);
     try {
       const result = parseImport(await file.text());
-      const before = snapshot();
-      const summary = applyImport(result);
-      onResult(summary, `${result.label} · ${file.name}`);
-      toast({ message: t('import.done'), tone: 'success', action: { label: t('common.undo'), run: () => restore(before) } });
+      // Let the user choose when a file holds more than one kind of data (always for paimon.moe backups).
+      if (result.kind === 'paimon' || result.accounts || partsOf(result).length > 1) setPending({ result, file: file.name });
+      else apply(result, file.name);
     } catch (e) {
       setError(e instanceof ImportError ? e.message : t('settings.importFailed'));
     }
@@ -141,7 +153,128 @@ function FileDrop({ onResult }: { onResult: (s: ImportSummary, label: string) =>
           <span>{error}</span>
         </div>
       )}
+      {pending && (
+        <ImportPicker
+          key={pending.file}
+          result={pending.result}
+          file={pending.file}
+          onCancel={() => setPending(null)}
+          onApply={(r, parts) => apply(r, pending.file, parts)}
+        />
+      )}
     </>
+  );
+}
+
+const PART_ORDER: ImportPart[] = ['wishes', 'achievements', 'roster', 'good', 'profile', 'realtime'];
+
+/** Lets the user pick which parts of a multi-part file (and which account) to import. */
+function ImportPicker({
+  result,
+  file,
+  onApply,
+  onCancel,
+}: {
+  result: ImportResult;
+  file: string;
+  onApply: (r: ImportResult, parts: ImportPart[]) => void;
+  onCancel: () => void;
+}) {
+  const t = useT();
+  const doneNow = useStore((s) => s.achievements.done);
+  const [account, setAccount] = useState(result.accounts?.[0]?.key ?? '');
+  const current = result.accounts?.find((a) => a.key === account)?.result ?? result;
+  const parts = useMemo(() => PART_ORDER.filter((p) => partsOf(current).includes(p)), [current]);
+  const [off, setOff] = useState<Set<ImportPart>>(new Set());
+  const chosen = parts.filter((p) => !off.has(p));
+  const locale = t.lang === 'de' ? 'de-DE' : 'en-US';
+  const day = (s: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(s.replace(' ', 'T')));
+
+  const info = (p: ImportPart): string => {
+    switch (p) {
+      case 'wishes': {
+        const times = current.wishes!.records.map((r) => r.time).sort();
+        return t('import.part.wishesInfo', { n: t.num(times.length), from: day(times[0]), to: day(times[times.length - 1]) });
+      }
+      case 'achievements': {
+        const ids = Object.keys(current.achievements!);
+        return t('import.part.achievementsInfo', { n: t.num(ids.length), new: t.num(ids.filter((id) => !(id in doneNow)).length) });
+      }
+      case 'roster':
+        return t('import.part.rosterInfo', { n: current.roster!.length });
+      case 'good':
+        return t('import.part.goodInfo', { c: current.good!.characters?.length ?? 0, w: current.good!.weapons?.length ?? 0, a: current.good!.artifacts?.length ?? 0 });
+      case 'profile': {
+        const a = current.account ?? {};
+        return [a.uid && `UID ${a.uid}`, a.level != null && `AR ${a.level}`, a.worldLevel != null && `WL ${a.worldLevel}`, a.server ?? current.server, a.nickname]
+          .filter(Boolean)
+          .join(' · ');
+      }
+      case 'realtime':
+        return t('import.part.realtimeInfo', { time: new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(current.realtime!.fetchedAt)) });
+    }
+  };
+
+  return (
+    <section className="card stack" aria-labelledby="pick-h">
+      <h2 id="pick-h" className="card-title">
+        {t('import.pickTitle')}
+      </h2>
+      <div className="pick-meta muted small">
+        <span>
+          {current.label} · {file}
+        </span>
+        {current.savedAt && (
+          <span>{t('import.savedAt', { date: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(current.savedAt)) })}</span>
+        )}
+        {result.accounts && (
+          <label className="row gap-sm">
+            {t('import.account')}
+            <select className="select select-sm" value={account} onChange={(e) => setAccount(e.target.value)}>
+              {result.accounts.map((a) => (
+                <option key={a.key} value={a.key}>
+                  {a.label}
+                  {a.result.account?.uid ? ` · ${a.result.account.uid}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      <ul className="pick-list">
+        {parts.map((p) => (
+          <li key={p}>
+            <label className="pick-item">
+              <input
+                type="checkbox"
+                checked={!off.has(p)}
+                onChange={(e) =>
+                  setOff((cur) => {
+                    const next = new Set(cur);
+                    if (e.target.checked) next.delete(p);
+                    else next.add(p);
+                    return next;
+                  })
+                }
+              />
+              <div>
+                <strong>{t(`import.part.${p}` as MessageKey)}</strong>
+                <span>{info(p)}</span>
+              </div>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="row gap-sm">
+        <Button variant="primary" disabled={!chosen.length} onClick={() => onApply(current, chosen)}>
+          {t('import.pickApply')}
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>
+          {t('import.pickCancel')}
+        </Button>
+        {!chosen.length && <span className="muted small">{t('import.pickNone')}</span>}
+      </div>
+    </section>
   );
 }
 
@@ -283,7 +416,15 @@ function StoredData() {
 
 export function Import() {
   const t = useT();
-  const [tab, setTab] = useState<Tab>('link');
+  const [tab, setTab] = useState<Tab>(() => {
+    try {
+      const v = sessionStorage.getItem('waypoint:import-tab');
+      sessionStorage.removeItem('waypoint:import-tab');
+      return v === 'file' || v === 'full' ? v : 'link';
+    } catch {
+      return 'link';
+    }
+  });
   const [result, setResult] = useState<{ s: ImportSummary; label: string } | null>(null);
   const onResult = (s: ImportSummary, label: string) => setResult({ s, label });
 
@@ -329,6 +470,7 @@ export function Import() {
         <section className="card">
           <FileDrop onResult={onResult} />
           <p className="muted small">{t('import.scanners')}</p>
+          <p className="muted small">{t('import.dropHintAch')}</p>
         </section>
       )}
 

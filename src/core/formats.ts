@@ -1,12 +1,14 @@
 /**
  * Import/export formats:
  *  - UIGF v3 and v4 (the community standard for wish history; used by most tools)
- *  - paimon.moe data backups
+ *  - paimon.moe data backups (wishes, achievements, characters, AR/WL, every account)
+ *  - UIAF achievement files (Snap Hutao, YaeAchievement, Cocogoat, …)
  *  - GOOD (Inventory Kamera, Genshin Optimizer, …)
  *  - Waypoint export bundles written by the CLI in tools/
  */
 import { findCharacter, findWeapon } from '../data/characters';
-import type { Account, GachaType, WishRecord } from '../lib/types';
+import type { Account, GachaType, Server, WishRecord } from '../lib/types';
+import { isUiaf, parsePaimonAchievements, parseUiaf, type Done, type UiafFile } from './achievements';
 import type { GoodData } from './good';
 import { POOL_OF, recordTime, sortRecords } from './wishStats';
 
@@ -31,12 +33,35 @@ export interface WaypointBundle {
 }
 
 export interface ImportResult {
-  kind: 'uigf' | 'paimon' | 'good' | 'waypoint';
+  kind: 'uigf' | 'paimon' | 'good' | 'waypoint' | 'uiaf';
   label: string;
   wishes?: { records: WishRecord[]; uid?: string };
   good?: GoodData;
   account?: Account;
+  /** Game server, sets the reset times. */
+  server?: Server;
   realtime?: Realtime;
+  achievements?: Done;
+  /** Owned characters by name with total copies (paimon.moe's character page). */
+  roster?: { name: string; copies: number }[];
+  /** When the source file was written (paimon.moe: last change). */
+  savedAt?: string;
+  /** Files with several game accounts (paimon.moe): one result per account. */
+  accounts?: { key: string; label: string; result: ImportResult }[];
+}
+
+/** The independent parts of an import a user can pick from. */
+export type ImportPart = 'wishes' | 'achievements' | 'roster' | 'good' | 'profile' | 'realtime';
+
+export function partsOf(r: ImportResult): ImportPart[] {
+  const parts: ImportPart[] = [];
+  if (r.wishes?.records.length) parts.push('wishes');
+  if (r.achievements && Object.keys(r.achievements).length) parts.push('achievements');
+  if (r.roster?.length) parts.push('roster');
+  if (r.good) parts.push('good');
+  if ((r.account && Object.values(r.account).some((v) => v != null && v !== '')) || r.server) parts.push('profile');
+  if (r.realtime) parts.push('realtime');
+  return parts;
 }
 
 export class ImportError extends Error {}
@@ -148,6 +173,8 @@ export function toUigfV4(records: WishRecord[], uid = '0', app = 'Waypoint'): Ui
 }
 
 // ── paimon.moe backup ─────────────────────────────────────────────────────
+// The backup is a dump of paimon.moe's local storage. Extra accounts store the
+// same keys with a prefix ("account2-wish-counter-standard", …), listed in "accounts".
 
 const PAIMON_KEYS: Record<string, GachaType> = {
   'wish-counter-beginners': '100',
@@ -157,6 +184,8 @@ const PAIMON_KEYS: Record<string, GachaType> = {
   'wish-counter-chronicled': '500',
 };
 
+const PAIMON_SERVER: Record<string, Server> = { Asia: 'asia', China: 'asia', America: 'america', Europe: 'europe' };
+
 interface PaimonPull {
   type?: string;
   code?: string;
@@ -165,12 +194,15 @@ interface PaimonPull {
   pity?: number;
 }
 
-function parsePaimon(json: Record<string, unknown>): ImportResult {
+const isPaimonKey = (k: string) => /^(account\d+-)?(wish-counter-|achievement$|characters$|wish-uid$)/.test(k);
+
+function paimonWishes(json: Record<string, unknown>, prefix: string): WishRecord[] {
   const records: WishRecord[] = [];
   let seq = 0;
   for (const [key, type] of Object.entries(PAIMON_KEYS)) {
-    const pulls = ((json[key] as { pulls?: PaimonPull[] } | undefined)?.pulls ?? []) as PaimonPull[];
+    const pulls = ((json[prefix + key] as { pulls?: PaimonPull[] } | undefined)?.pulls ?? []) as PaimonPull[];
     for (const p of pulls) {
+      if (!p?.id || !p.time) continue;
       const name = p.id.replace(/_/g, ' ');
       const kind: 'character' | 'weapon' = p.type === 'weapon' ? 'weapon' : p.type === 'character' ? 'character' : itemKind(name);
       const def = kind === 'character' ? findCharacter(name) : findWeapon(name);
@@ -187,8 +219,56 @@ function parsePaimon(json: Record<string, unknown>): ImportResult {
       });
     }
   }
-  if (!records.length) throw new ImportError('No wishes found in this paimon.moe backup.');
-  return { kind: 'paimon', label: 'paimon.moe backup', wishes: { records, uid: (json['wish-uid'] as string) || undefined } };
+  return records;
+}
+
+function paimonAccount(json: Record<string, unknown>, prefix: string): ImportResult {
+  const records = paimonWishes(json, prefix);
+  const uid = (json[`${prefix}wish-uid`] as string) || undefined;
+  const chars = json[`${prefix}characters`];
+  const roster =
+    chars && typeof chars === 'object' && !Array.isArray(chars)
+      ? Object.entries(chars as Record<string, { default?: number; wish?: number; manual?: number }>)
+          .map(([id, c]) => ({ name: id.replace(/_/g, ' '), copies: (c?.default ?? 0) + (c?.wish ?? 0) + (c?.manual ?? 0) }))
+          .filter((c) => c.copies > 0)
+      : undefined;
+  const num = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? undefined : Number(v));
+  const serverName = json[`${prefix}server`] as string | undefined;
+  const account: Account = {};
+  if (uid) account.uid = uid;
+  if (num(json[`${prefix}ar`]) != null) account.level = num(json[`${prefix}ar`]);
+  if (num(json[`${prefix}wl`]) != null) account.worldLevel = num(json[`${prefix}wl`]);
+  if (serverName) account.server = serverName;
+  return {
+    kind: 'paimon',
+    label: 'paimon.moe backup',
+    wishes: records.length ? { records, uid } : undefined,
+    achievements: parsePaimonAchievements(json[`${prefix}achievement`]),
+    roster: roster?.length ? roster : undefined,
+    account,
+    server: serverName ? PAIMON_SERVER[serverName] : undefined,
+  };
+}
+
+function parsePaimon(json: Record<string, unknown>): ImportResult {
+  const extra = String(json.accounts ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // Also pick up prefixed accounts that are missing from the list.
+  for (const k of Object.keys(json)) {
+    const m = /^(account\d+)-/.exec(k);
+    if (m && !extra.includes(m[1])) extra.push(m[1]);
+  }
+  const savedAt = typeof json['update-time'] === 'string' ? (json['update-time'] as string) : undefined;
+  const accounts = [
+    { key: 'main', label: 'Main', result: paimonAccount(json, '') },
+    ...extra.map((a) => ({ key: a, label: `Account ${a.replace(/^account/, '')}`, result: paimonAccount(json, `${a}-`) })),
+  ]
+    .filter((a) => partsOf(a.result).some((p) => p !== 'profile'))
+    .map((a) => ({ ...a, result: { ...a.result, savedAt } }));
+  if (!accounts.length) throw new ImportError('This paimon.moe backup contains no wishes, achievements or characters.');
+  return { ...accounts[0].result, accounts: accounts.length > 1 ? accounts : undefined };
 }
 
 // ── Detection ─────────────────────────────────────────────────────────────
@@ -211,9 +291,14 @@ export function parseImport(text: string): ImportResult {
     return { kind: 'waypoint', label: 'Waypoint export', wishes, good: b.good, account: b.account, realtime: b.realtime };
   }
   if (json.format === 'GOOD') return { kind: 'good', label: `GOOD (${String(json.source ?? 'unknown source')})`, good: json as unknown as GoodData };
+  if (isUiaf(json)) {
+    const info = (json as unknown as UiafFile).info;
+    const at = info.export_timestamp ? new Date(info.export_timestamp * 1000).toISOString() : undefined;
+    return { kind: 'uiaf', label: `UIAF (${info.export_app ?? 'unknown app'})`, achievements: parseUiaf(json as unknown as UiafFile), savedAt: at };
+  }
   if (Array.isArray(json.hk4e) || (json.info && Array.isArray(json.list))) return parseUigf(json);
-  if (Object.keys(PAIMON_KEYS).some((k) => k in json)) return parsePaimon(json);
-  throw new ImportError('Unrecognised file. Supported: Waypoint export, UIGF v3/v4, paimon.moe backup, GOOD.');
+  if (Object.keys(json).some(isPaimonKey)) return parsePaimon(json);
+  throw new ImportError('Unrecognised file. Supported: Waypoint export, UIGF v3/v4, paimon.moe backup, GOOD, UIAF.');
 }
 
 // ── Merging ───────────────────────────────────────────────────────────────

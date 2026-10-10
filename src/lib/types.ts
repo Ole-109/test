@@ -251,6 +251,14 @@ export interface AppState {
   account: Account;
   /** Characters in the farming plan with their target level and talents. */
   farming: FarmTarget[];
+  achievements: AchievementState;
+}
+
+export interface AchievementState {
+  /** Completed achievement steps (in-game ids) → completion time in ms (0 = unknown, e.g. imported). */
+  done: Record<string, number>;
+  importedAt?: number;
+  source?: string;
 }
 
 export interface FarmTarget {

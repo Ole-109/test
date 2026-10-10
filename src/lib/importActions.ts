@@ -1,6 +1,7 @@
 import { findCharacter, findWeapon } from '../data/characters';
 import { fromGoodKey, setSummary, type GoodData } from '../core/good';
-import { mergeWishes, type ImportResult, type Realtime } from '../core/formats';
+import { mergeDone } from '../core/achievements';
+import { mergeWishes, partsOf, type ImportPart, type ImportResult, type Realtime } from '../core/formats';
 import { analyzePool, BANNER_POOLS, characterCopies, POOL_OF } from '../core/wishStats';
 import { newOwned } from './actions';
 import { RESIN_INTERVAL } from './resin';
@@ -20,6 +21,11 @@ export interface ImportSummary {
   artifacts: number;
   unknown: string[];
   realtime: boolean;
+  /** Newly completed achievements / total completed after the import (when achievements were imported). */
+  achievements?: { added: number; total: number };
+  /** Characters set from paimon.moe's character list. */
+  roster: number;
+  profile: boolean;
 }
 
 /** Re-derives pity, totals, guarantee and 5★ history for banners that have imported records. */
@@ -186,11 +192,44 @@ export function ensureCharacterSync() {
   if (s.wishes.length && s.wishMeta.charSync !== s.wishes.length) setState(syncCharactersFromWishes(s).state);
 }
 
-/** Applies an import result to the store. Returns a summary for the UI. */
-export function applyImport(result: ImportResult): ImportSummary {
-  const summary: ImportSummary = { hadWishes: !!result.wishes?.records.length, wishesAdded: 0, wishesTotal: 0, characters: 0, fromWishes: { added: 0, raised: 0 }, weapons: 0, artifacts: 0, unknown: [], realtime: false };
+/** Owned characters with copies from paimon.moe; raises constellations, never lowers them. */
+function applyRoster(s: AppState, roster: NonNullable<ImportResult['roster']>, summary: ImportSummary): AppState {
+  const characters = { ...s.characters };
+  const now = Date.now();
+  for (const { name, copies } of roster) {
+    const def = findCharacter(name) ?? (/^traveler/i.test(name) ? findCharacter('traveler') : undefined);
+    if (!def) {
+      summary.unknown.push(name);
+      continue;
+    }
+    const cons = def.id === 'traveler' ? 0 : Math.min(6, copies - 1);
+    const prev = characters[def.id];
+    if (!prev) characters[def.id] = { ...newOwned(), constellation: cons, detailsKnown: false, updatedAt: now };
+    else if (prev.constellation < cons) characters[def.id] = { ...prev, constellation: cons, updatedAt: now };
+    else continue;
+    summary.roster++;
+  }
+  return { ...s, characters };
+}
+
+/** Applies an import result to the store, limited to `parts` (default: everything). Returns a summary for the UI. */
+export function applyImport(result: ImportResult, parts: ImportPart[] = partsOf(result)): ImportSummary {
+  const want = new Set(parts);
+  const summary: ImportSummary = {
+    hadWishes: want.has('wishes') && !!result.wishes?.records.length,
+    wishesAdded: 0,
+    wishesTotal: 0,
+    characters: 0,
+    fromWishes: { added: 0, raised: 0 },
+    weapons: 0,
+    artifacts: 0,
+    unknown: [],
+    realtime: false,
+    roster: 0,
+    profile: false,
+  };
   let s = getState();
-  if (result.wishes?.records.length) {
+  if (want.has('wishes') && result.wishes?.records.length) {
     const { list, added } = mergeWishes(s.wishes, result.wishes.records);
     summary.wishesAdded = added;
     s = {
@@ -201,14 +240,24 @@ export function applyImport(result: ImportResult): ImportSummary {
     s = recomputeBanners(s);
   }
   summary.wishesTotal = s.wishes.length;
-  if (result.good) s = applyGood(s, result.good, summary);
-  if (s.wishes.length) {
+  if (want.has('good') && result.good) s = applyGood(s, result.good, summary);
+  if (want.has('roster') && result.roster) s = applyRoster(s, result.roster, summary);
+  if (want.has('wishes') && s.wishes.length) {
     const synced = syncCharactersFromWishes(s);
     s = synced.state;
     summary.fromWishes = { added: synced.added, raised: synced.raised };
   }
-  if (result.account) s = { ...s, account: { ...s.account, ...result.account } };
-  if (result.realtime) s = applyRealtime(s, result.realtime, summary);
+  if (want.has('achievements') && result.achievements) {
+    const { done, added } = mergeDone(s.achievements.done, result.achievements);
+    s = { ...s, achievements: { done, importedAt: Date.now(), source: result.label } };
+    summary.achievements = { added, total: Object.keys(done).length };
+  }
+  if (want.has('profile')) {
+    if (result.account) s = { ...s, account: { ...s.account, ...result.account } };
+    if (result.server) s = { ...s, settings: { ...s.settings, server: result.server } };
+    summary.profile = true;
+  }
+  if (want.has('realtime') && result.realtime) s = applyRealtime(s, result.realtime, summary);
   setState(s);
   return summary;
 }

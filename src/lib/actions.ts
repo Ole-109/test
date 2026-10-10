@@ -1,3 +1,4 @@
+import { setStepsDone, type Achievement } from '../core/achievements';
 import { withProgress, withStatus } from './anime';
 import { resinAt, setResin } from './resin';
 import { findCharacter } from '../data/characters';
@@ -246,4 +247,15 @@ export function patchFarmTarget(id: string, patch: Partial<FarmTarget>) {
 
 export function removeFarmTarget(id: string) {
   update('farming', (list) => list.filter((f) => f.id !== id));
+}
+
+// ── Achievements ──────────────────────────────────────────────────────────
+
+/** Sets how many tiers of an achievement are completed (0 = none). */
+export function setAchievementSteps(a: Achievement, count: number) {
+  setState((s) => ({ ...s, achievements: { ...s.achievements, done: setStepsDone(s.achievements.done, a, count) } }));
+}
+
+export function resetAchievements() {
+  setState((s) => ({ ...s, achievements: { done: {} } }));
 }

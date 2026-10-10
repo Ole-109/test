@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tools/cli",
     "test": "vitest run",
     "build:cli": "esbuild tools/cli/main.ts --bundle --platform=node --format=esm --target=node18 --outfile=tools/dist/waypoint-export.mjs \"--banner:js=#!/usr/bin/env node\" --log-level=warning",
-    "sync-data": "node scripts/sync-game-data.mjs"
+    "sync-data": "node scripts/sync-game-data.mjs && node scripts/sync-achievements.mjs"
   },
   "dependencies": {
     "lucide-react": "1.40.0",

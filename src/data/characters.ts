@@ -116,7 +116,9 @@ export const characterByAvatarId = (id: number) => BASE_CHARACTERS.find((c) => c
 
 /** Icon CDN (Project Amber). Images are only referenced, never bundled. */
 export const iconUrl = (icon?: string) =>
-  icon ? `https://gi.yatta.moe/assets/UI/${icon.startsWith('UI_RelicIcon') ? 'reliquary/' : ''}${icon}.png` : undefined;
+  icon
+    ? `https://gi.yatta.moe/assets/UI/${icon.startsWith('UI_RelicIcon') ? 'reliquary/' : icon.startsWith('UI_AchievementIcon') ? 'achievement/' : ''}${icon}.png`
+    : undefined;
 
 /**
  * 5★ characters in the standard pool, with the date they joined it (ms).

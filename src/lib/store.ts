@@ -55,6 +55,7 @@ export function defaultState(): AppState {
     inventory: { weapons: [], artifacts: [], materials: {} },
     account: {},
     farming: [],
+    achievements: { done: {} },
   };
 }
 
@@ -87,6 +88,7 @@ export function hydrate(raw: unknown): AppState {
     inventory: { ...base.inventory, ...r.inventory },
     account: { ...r.account },
     farming: Array.isArray(r.farming) ? r.farming : [],
+    achievements: { ...r.achievements, done: { ...r.achievements?.done } },
   };
 }
 
