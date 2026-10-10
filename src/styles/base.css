@@ -17,6 +17,9 @@ body {
   font-family: var(--font-ui);
   font-size: 14px;
   line-height: 1.5;
+  /* Inter: single-storey a, open digits off, contextual alternates; optical sizing follows font size. */
+  font-feature-settings: 'cv11', 'calt';
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
@@ -35,10 +38,15 @@ p {
 }
 
 h1 {
-  font-size: 22px;
-  font-weight: 650;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.028em;
+}
+
+h2,
+h3 {
+  letter-spacing: -0.012em;
 }
 
 a {
@@ -80,7 +88,28 @@ img {
 }
 
 ::selection {
-  background: var(--accent-soft);
+  background: var(--accent-line);
+}
+
+/* Quiet scrollbars that match the surfaces. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--surface-3) padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .num {
@@ -182,6 +211,7 @@ img {
 @keyframes fade {
   from {
     opacity: 0;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;

@@ -4,10 +4,11 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px 16px;
-  border-radius: var(--r-md);
-  background: var(--surface);
+  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  background: var(--card-bg);
   border: 1px solid var(--border);
+  box-shadow: var(--card-shadow);
   min-width: 0;
 }
 
@@ -23,8 +24,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .card-link {
@@ -51,8 +53,9 @@
 }
 
 .badge-accent {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-ink);
+  box-shadow: var(--highlight);
 }
 
 .tag {
@@ -76,10 +79,15 @@
   border: 1px solid transparent;
   font-size: 13.5px;
   font-weight: 600;
+  letter-spacing: -0.005em;
   white-space: nowrap;
   text-decoration: none !important;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s, filter 0.14s, transform 0.08s;
   -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
 
 .btn:disabled {
@@ -93,22 +101,23 @@
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-ink);
+  box-shadow: var(--accent-shadow);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-strong);
+  filter: brightness(1.06) saturate(1.05);
 }
 
 .btn-secondary {
   background: var(--surface-2);
-  border-color: var(--border);
+  border-color: var(--border-strong);
   color: var(--text);
+  box-shadow: var(--highlight), 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  border-color: var(--border-strong);
   background: var(--surface-3);
 }
 
@@ -155,8 +164,9 @@
 }
 
 .icon-btn.accent {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-ink);
+  box-shadow: var(--accent-shadow);
 }
 
 .icon-btn:disabled {
@@ -188,9 +198,10 @@
 }
 
 .chip-btn.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-grad);
+  border-color: transparent;
   color: var(--accent-ink);
+  box-shadow: var(--accent-shadow);
 }
 
 .chip-toggle {
@@ -217,8 +228,9 @@
   padding: 2px;
   gap: 2px;
   border-radius: var(--r-sm);
-  background: var(--surface-2);
+  background: var(--input-bg);
   border: 1px solid var(--border);
+  box-shadow: var(--input-shadow);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -248,9 +260,9 @@
 }
 
 .segmented button.is-active {
-  background: var(--surface);
+  background: var(--raised);
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: var(--raised-shadow);
 }
 
 .segmented-sm button {
@@ -322,9 +334,11 @@
   height: 34px;
   padding: 0 10px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  background-color: var(--input-bg);
+  box-shadow: var(--input-shadow);
   outline: none;
+  transition: border-color 0.14s, box-shadow 0.14s;
 }
 
 .select {
@@ -355,6 +369,7 @@
 .input:focus,
 .select:focus-visible {
   border-color: var(--accent-line);
+  box-shadow: var(--input-shadow), var(--ring);
   outline: none;
 }
 
@@ -378,13 +393,16 @@ textarea::placeholder {
   height: 34px;
   padding: 0 6px 0 10px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  background: var(--input-bg);
+  box-shadow: var(--input-shadow);
   color: var(--muted);
+  transition: border-color 0.14s, box-shadow 0.14s;
 }
 
 .search:focus-within {
   border-color: var(--accent-line);
+  box-shadow: var(--input-shadow), var(--ring);
 }
 
 .search input {
@@ -553,7 +571,8 @@ textarea::placeholder {
 
 .bar-fill {
   height: 100%;
-  background: var(--accent);
+  border-radius: inherit;
+  background: var(--accent-grad);
 }
 
 .el-icon {
@@ -912,12 +931,23 @@ textarea::placeholder {
   width: min(500px, calc(100vw - 32px));
   max-height: min(86dvh, 820px);
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--card-bg);
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   outline: none;
-  animation: fade 0.15s ease both;
+  animation: pop 0.2s var(--ease) both;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .sheet-panel.is-wide {
