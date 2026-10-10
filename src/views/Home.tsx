@@ -5,6 +5,7 @@ import { PageHeader, Ring } from '../components/ui';
 import { Cover, ItemIcon } from '../components/visuals';
 import { findCharacter } from '../data/characters';
 import { itemVisual } from './genshin/Wishes';
+import { matName, useFarmToday } from './genshin/Farming';
 import { useT } from '../i18n';
 import { toggleTask } from '../lib/actions';
 import { behindBy, displayTitle, occurrences } from '../lib/anime';
@@ -31,6 +32,7 @@ export function Home() {
         <PityCard />
         <ContinueCard now={now} />
         <AiringCard now={now} />
+        <FarmTodayCard />
       </div>
     </div>
   );
@@ -287,6 +289,41 @@ function AiringCard({ now }: { now: number }) {
           })}
         </ul>
       )}
+    </section>
+  );
+}
+
+function FarmTodayCard() {
+  const t = useT();
+  const hasPlan = useStore((s) => s.farming.length > 0);
+  const { weekday, open } = useFarmToday();
+  if (!hasPlan) return null;
+  return (
+    <section className="card farm-mini" aria-labelledby="home-farm">
+      <div className="card-head">
+        <h2 id="home-farm" className="card-title">
+          {t('home.farmToday')}
+        </h2>
+        <CardLink to="/teyvat/farming" label={t('nav.farming')} />
+      </div>
+      {open.length === 0 ? (
+        <p className="muted">{t('farm.todayNone')}</p>
+      ) : (
+        <ul className="farm-today">
+          {open.map(({ book, characters }) => (
+            <li key={book.id}>
+              <ItemIcon icon={book.icon} name={book.name} rarity={2} size={30} />
+              <div className="farm-today-text">
+                <strong>{matName(book, t.lang)}</strong>
+                <span className="muted small">
+                  {book.domain} · {characters.length}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {weekday === 0 && <p className="muted small">{t('farm.todaySunday')}</p>}
     </section>
   );
 }

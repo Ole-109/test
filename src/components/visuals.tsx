@@ -14,11 +14,38 @@ const ELEMENT_ICON: Record<Element, typeof Flame> = {
   adaptive: Sparkles,
 };
 
+/** In-game element icon names (UI_Buff_Element_*). */
+const ELEMENT_ASSET: Partial<Record<Element, string>> = {
+  pyro: 'Fire',
+  hydro: 'Water',
+  anemo: 'Wind',
+  electro: 'Electric',
+  dendro: 'Grass',
+  cryo: 'Ice',
+  geo: 'Rock',
+};
+
+/** The game's element symbol; falls back to a drawn glyph if the image can't load. */
 export function ElementIcon({ element, size = 14, title }: { element: Element; size?: number; title?: string }) {
+  const [failed, setFailed] = useState(false);
+  const asset = ELEMENT_ASSET[element];
   const Icon = ELEMENT_ICON[element];
   return (
     <span className={`el-icon el-${element}`} title={title} aria-label={title} role={title ? 'img' : undefined}>
-      <Icon size={size} strokeWidth={2.2} aria-hidden />
+      {asset && !failed ? (
+        <img
+          src={iconUrl(`UI_Buff_Element_${asset}`)}
+          alt=""
+          width={size}
+          height={size}
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          aria-hidden
+        />
+      ) : (
+        <Icon size={size} strokeWidth={2.2} aria-hidden />
+      )}
     </span>
   );
 }

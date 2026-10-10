@@ -140,4 +140,25 @@ export function characterCopies(records: WishRecord[]): Map<string, CharacterCop
   return out;
 }
 
+export interface WeaponCopies {
+  name: string;
+  copies: number;
+  rank: number;
+  last: string;
+}
+
+/** 4★ and 5★ weapons in the wish history with how many copies were pulled. */
+export function weaponCopies(records: WishRecord[]): WeaponCopies[] {
+  const out = new Map<string, WeaponCopies>();
+  for (const r of sortRecords(records)) {
+    if (r.itemType !== 'weapon' || r.rank < 4) continue;
+    const e = out.get(r.name);
+    if (e) {
+      e.copies++;
+      e.last = r.time;
+    } else out.set(r.name, { name: r.name, copies: 1, rank: r.rank, last: r.time });
+  }
+  return [...out.values()].sort((a, b) => b.rank - a.rank || b.copies - a.copies || a.name.localeCompare(b.name));
+}
+
 export const BANNER_POOLS: BannerKey[] = ['character', 'weapon', 'standard', 'chronicled'];

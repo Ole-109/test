@@ -38,4 +38,15 @@ function hoyoProxy(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [react(), hoyoProxy()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Game data and React change on different schedules than app code; split them for caching.
+        manualChunks(id) {
+          if (id.includes('/src/data/game.json')) return 'game-data';
+          if (id.includes('node_modules/react') || id.includes('node_modules/scheduler')) return 'react';
+        },
+      },
+    },
+  },
 });

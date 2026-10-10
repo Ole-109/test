@@ -101,8 +101,67 @@ const artifactSets = Object.entries(relEn).map(([key, r]) => ({
   icon: r.icon,
 }));
 
+// ── Level-up materials (ascension + talent costs, domain days) ─────────────
+const [matEn, matDe] = await Promise.all([get('en/material'), get('de/material')]);
+const DAY = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+
+async function pool(items, size, fn) {
+  const out = [];
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: size }, async () => {
+      while (i < items.length) {
+        const idx = i++;
+        out[idx] = await fn(items[idx]);
+      }
+    }),
+  );
+  return out;
+}
+
+const pack = (costItems, coin) => [Object.fromEntries(Object.entries(costItems ?? {}).map(([k, v]) => [k, v])), coin ?? 0];
+const usedIds = new Set();
+await pool(characters.filter((c) => c.id !== 'traveler'), 6, async (c) => {
+  const d = (await (await fetch(`${API}/en/avatar/${c.avatarId}`, { headers: { 'User-Agent': 'waypoint-data-sync' } })).json()).data;
+  const asc = (d.upgrade?.promote ?? []).filter((p) => p.promoteLevel > 0).map((p) => pack(p.costItems, p.coinCost));
+  // All three talents cost the same; take the normal attack's level 2–10 costs.
+  const na = Object.values(d.talent ?? {}).find((t) => t.type === 0 && t.promote);
+  const talent = na ? [2, 3, 4, 5, 6, 7, 8, 9, 10].map((l) => pack(na.promote[l]?.costItems, na.promote[l]?.coinCost)) : [];
+  for (const [items] of [...asc, ...talent]) for (const id of Object.keys(items)) usedIds.add(id);
+  c.mats = { asc, talent };
+});
+
+const materials = {};
+for (const id of usedIds) {
+  const m = matEn[id];
+  if (!m) continue;
+  materials[id] = { name: m.name, nameDe: matDe[id]?.name ?? m.name, rank: m.rank, icon: m.icon, type: m.type };
+}
+// Domain days for talent books (one request per book series), drop sources for boss materials.
+const books = Object.entries(materials).filter(([, m]) => m.type === 'characterTalentMaterial' && m.rank === 2);
+const bosses = Object.entries(materials).filter(
+  // Normal boss drops (rank 4) and weekly boss drops (rank 5, typed either way), not the Crown.
+  ([id, m]) => (m.type === 'characterLevelUpMaterial' && m.rank >= 4) || (m.type === 'characterTalentMaterial' && m.rank === 5 && id !== '104319'),
+);
+await pool([...books, ...bosses], 6, async ([id, m]) => {
+  const d = (await (await fetch(`${API}/en/material/${id}`, { headers: { 'User-Agent': 'waypoint-data-sync' } })).json()).data;
+  const domain = (d.source ?? []).find((s) => s.type === 'domain' && s.days);
+  if (m.type === 'characterTalentMaterial' && m.rank === 2 && domain) {
+    // The whole series (green/blue/purple ids follow each other) shares the domain.
+    for (const sid of [Number(id), Number(id) + 1, Number(id) + 2]) {
+      if (materials[sid]) {
+        materials[sid].days = domain.days.map((x) => DAY[x]);
+        materials[sid].domain = domain.name.replace(/^Domain of Mastery: /, '');
+      }
+    }
+  } else {
+    const by = d.additions?.droppedBy?.[0]?.name;
+    if (by) materials[id].from = by;
+  }
+});
+
 characters.sort((a, b) => a.name.localeCompare(b.name));
 artifactSets.sort((a, b) => b.id - a.id);
 weapons.sort((a, b) => b.rarity - a.rarity || a.name.localeCompare(b.name));
-writeFileSync(OUT, JSON.stringify({ updated: new Date().toISOString().slice(0, 10), characters, weapons, artifactSets }, null, 0) + '\n', 'utf8');
-console.log(`Wrote ${characters.length} characters, ${weapons.length} weapons, ${artifactSets.length} artifact sets to ${OUT}`);
+writeFileSync(OUT, JSON.stringify({ updated: new Date().toISOString().slice(0, 10), characters, weapons, artifactSets, materials }, null, 0) + '\n', 'utf8');
+console.log(`Wrote ${characters.length} characters, ${weapons.length} weapons, ${artifactSets.length} artifact sets, ${Object.keys(materials).length} materials to ${OUT}`);

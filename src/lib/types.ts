@@ -249,4 +249,12 @@ export interface AppState {
   wishMeta: WishMeta;
   inventory: Inventory;
   account: Account;
+  /** Characters in the farming plan with their target level and talents. */
+  farming: FarmTarget[];
+}
+
+export interface FarmTarget {
+  id: string;
+  level: number;
+  talents: [number, number, number];
 }
