@@ -2,7 +2,7 @@ import { Compass, LayoutGrid, List, PenLine, Plus, Search, StarOff, Tv, X } from
 import { useMemo, useState } from 'react';
 import { Button, Empty, IconButton, PageHeader } from '../../components/ui';
 import { useT } from '../../i18n';
-import { behindBy, displayTitle, isUnrated, STATUSES } from '../../lib/anime';
+import { behindBy, displayTitle, isUnrated, isUntouched, STATUSES } from '../../lib/anime';
 import { useNow } from '../../lib/hooks';
 import { navigate } from '../../lib/router';
 import { useStore } from '../../lib/store';
@@ -67,6 +67,11 @@ export function Library() {
         // In "Watching", shows with new episodes come first.
         if (tab === 'watching' && sort === 'updated') {
           const d = Number(behindBy(b, now) > 0) - Number(behindBy(a, now) > 0);
+          if (d) return d;
+        }
+        // In "All", shows you have started come before ones you only plan to watch.
+        if (tab === 'all' && sort === 'updated') {
+          const d = Number(isUntouched(a)) - Number(isUntouched(b));
           if (d) return d;
         }
         return cmp[sort](a, b);

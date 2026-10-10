@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { DEFAULT_TASKS } from '../data/tasks';
+import { repairAnime } from './anime';
 import type { AppState, BannerKey, BannerState } from './types';
 
 export const STORAGE_KEY = 'waypoint:v1';
@@ -83,7 +84,7 @@ export function hydrate(raw: unknown): AppState {
     customCharacters: r.customCharacters ?? [],
     banners,
     plan: { ...base.plan, ...r.plan },
-    anime: Array.isArray(r.anime) ? r.anime : [],
+    anime: Array.isArray(r.anime) ? r.anime.map(repairAnime) : [],
     wishes: Array.isArray(r.wishes) ? r.wishes : [],
     wishMeta: { ...base.wishMeta, ...r.wishMeta, overrides: { ...r.wishMeta?.overrides } },
     inventory: { ...base.inventory, ...r.inventory },

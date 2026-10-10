@@ -93,10 +93,27 @@ export function withStatus(a: AnimeEntry, status: AnimeStatus, now = Date.now())
   if (status === 'completed') {
     next.completedAt = now;
     if (a.episodes) next.progress = a.episodes;
+  } else if (a.status === 'completed') {
+    next.completedAt = undefined;
+    // "Completed" filled in every episode; moving it back to "Plan to watch" means it wasn't watched.
+    if (status === 'planning') next.progress = 0;
   }
   if (status === 'watching' && !a.startedAt) next.startedAt = now;
   return next;
 }
 
-/** Watched (finished or at least one episode seen) but not scored yet. */
-export const isUnrated = (a: Pick<AnimeEntry, 'score' | 'status' | 'progress'>) => a.score === 0 && (a.status === 'completed' || a.progress > 0);
+/** Watched (finished or at least one episode seen) but not scored yet. Planned shows never count. */
+export const isUnrated = (a: Pick<AnimeEntry, 'score' | 'status' | 'progress'>) =>
+  a.score === 0 && a.status !== 'planning' && (a.status === 'completed' || a.progress > 0);
+
+/** Not started yet: planned with no episode seen. */
+export const isUntouched = (a: Pick<AnimeEntry, 'status' | 'progress'>) => a.status === 'planning' && a.progress === 0;
+
+/**
+ * Repairs entries saved by older versions: a show moved from "Completed" back
+ * to "Plan to watch" kept every episode marked as seen.
+ */
+export function repairAnime(a: AnimeEntry): AnimeEntry {
+  if (a.status === 'planning' && a.completedAt) return { ...a, progress: 0, completedAt: undefined };
+  return a;
+}

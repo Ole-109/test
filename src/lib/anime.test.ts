@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { airedEpisodes, behindBy, isUnrated, occurrences, projectedAiring, withProgress, withStatus } from './anime';
+import { airedEpisodes, behindBy, isUnrated, occurrences, projectedAiring, repairAnime, withProgress, withStatus } from './anime';
+import { hydrate } from './store';
 import { DAY } from './time';
 import type { AnimeEntry } from './types';
 
@@ -78,5 +79,25 @@ describe('unrated', () => {
     expect(isUnrated({ score: 0, status: 'dropped', progress: 1 })).toBe(true);
     expect(isUnrated({ score: 0, status: 'planning', progress: 0 })).toBe(false);
     expect(isUnrated({ score: 7, status: 'completed', progress: 12 })).toBe(false);
+    // A planned show is never "watched", whatever its episode count says.
+    expect(isUnrated({ score: 0, status: 'planning', progress: 24 })).toBe(false);
+  });
+
+  it('moving a completed show back to "Plan to watch" clears the episodes it filled in', () => {
+    const done = withStatus(entry({ episodes: 24 }), 'completed', 1000);
+    expect(done.progress).toBe(24);
+    const planned = withStatus(done, 'planning', 2000);
+    expect(planned).toMatchObject({ status: 'planning', progress: 0, completedAt: undefined });
+    // Back to "Watching" keeps the episodes but is no longer completed.
+    const watching = withStatus(done, 'watching', 2000);
+    expect(watching).toMatchObject({ status: 'watching', progress: 24, completedAt: undefined });
+  });
+
+  it('repairs entries saved by older versions', () => {
+    const broken = entry({ status: 'planning', progress: 24, episodes: 24, completedAt: 5 });
+    expect(repairAnime(broken)).toMatchObject({ progress: 0, completedAt: undefined });
+    const fine = entry({ status: 'planning', progress: 0 });
+    expect(repairAnime(fine)).toBe(fine);
+    expect(hydrate({ anime: [broken] }).anime[0].progress).toBe(0);
   });
 });
