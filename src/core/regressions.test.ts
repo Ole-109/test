@@ -75,6 +75,21 @@ describe('GOOD imports', () => {
     expect(getState().inventory.weapons).toHaveLength(1);
   });
 
+  it('does not store 1–3★ weapons in the inventory, but still equips them', () => {
+    applyImport(
+      good({
+        characters: [{ key: 'Bennett', level: 80, constellation: 6, ascension: 6, talent: { auto: 8, skill: 8, burst: 8 } }],
+        weapons: [
+          { key: 'SkywardHarp', level: 90, ascension: 6, refinement: 1, location: '', lock: false },
+          { key: 'CoolSteel', level: 90, ascension: 6, refinement: 5, location: 'Bennett', lock: false },
+        ],
+      }),
+    );
+    expect(getState().inventory.weapons.map((w) => w.name)).toEqual(['Skyward Harp']);
+    expect(getState().characters.bennett.weapon).toBe('Cool Steel');
+    expect(hydrate({ inventory: { weapons: [{ key: 'CoolSteel', name: 'Cool Steel' }] } }).inventory.weapons).toEqual([]);
+  });
+
   it('keeps the most developed Traveler and does not reset missing talents', () => {
     applyImport(
       good({

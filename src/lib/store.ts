@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { DEFAULT_TASKS } from '../data/tasks';
 import { repairAnime } from './anime';
+import { findWeapon } from '../data/characters';
 import type { AppState, BannerKey, BannerState } from './types';
 
 export const STORAGE_KEY = 'waypoint:v1';
@@ -61,6 +62,9 @@ export function defaultState(): AppState {
   };
 }
 
+/** Inventory weapons worth storing: 4★ and 5★ (unknown weapons are kept). */
+const isWorthKeeping = (w: { key: string; name: string }) => (findWeapon(w.name)?.rarity ?? findWeapon(w.key)?.rarity ?? 5) >= 4;
+
 /** Plain object or undefined (arrays, null and primitives are rejected). */
 const obj = <T,>(v: unknown): Partial<T> | undefined => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Partial<T>) : undefined);
 /** Array of objects; anything else (null entries from a damaged file) is dropped. */
@@ -110,7 +114,8 @@ export function hydrate(raw: unknown): AppState {
     inventory: {
       ...base.inventory,
       ...inv,
-      weapons: list(inv.weapons) ?? [],
+      // Older saves kept 1–3★ weapons too; drop them to save space.
+      weapons: (list<{ key: string; name: string }>(inv.weapons) ?? []).filter(isWorthKeeping),
       artifacts: list(inv.artifacts) ?? [],
       materials: obj<Record<string, number>>(inv.materials) ?? {},
     } as AppState['inventory'],

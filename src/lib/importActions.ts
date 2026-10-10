@@ -130,7 +130,8 @@ function applyGood(s: AppState, good: GoodData, summary: ImportSummary): AppStat
     // A partial scan (e.g. artifacts only) replaces only the sections it contains.
     inventory: hasInventory
       ? {
-          weapons: good.weapons ? weapons : s.inventory.weapons,
+          // 1–3★ weapons are not kept in the inventory (they only take space); equipped ones still show on characters.
+          weapons: good.weapons ? weapons.filter((w) => (findWeapon(w.name)?.rarity ?? 5) >= 4) : s.inventory.weapons,
           artifacts: good.artifacts ? artifacts : s.inventory.artifacts,
           materials: good.materials ?? s.inventory.materials,
           importedAt: now,
