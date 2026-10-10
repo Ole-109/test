@@ -54,6 +54,8 @@ export function defaultState(): AppState {
     wishMeta: { overrides: {} },
     inventory: { weapons: [], artifacts: [], materials: {} },
     account: {},
+    farming: [],
+    achievements: { done: {} },
   };
 }
 
@@ -85,6 +87,8 @@ export function hydrate(raw: unknown): AppState {
     wishMeta: { ...base.wishMeta, ...r.wishMeta, overrides: { ...r.wishMeta?.overrides } },
     inventory: { ...base.inventory, ...r.inventory },
     account: { ...r.account },
+    farming: Array.isArray(r.farming) ? r.farming : [],
+    achievements: { ...r.achievements, done: { ...r.achievements?.done } },
   };
 }
 

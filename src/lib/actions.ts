@@ -1,8 +1,10 @@
+import { setStepsDone, type Achievement } from '../core/achievements';
 import { withProgress, withStatus } from './anime';
 import { resinAt, setResin } from './resin';
 import { findCharacter } from '../data/characters';
 import { getState, setState, uid, update } from './store';
 import type {
+  FarmTarget,
   AnimeEntry,
   AnimeStatus,
   AppState,
@@ -226,4 +228,34 @@ export function mergeSynced(patches: Map<number, Partial<AnimeEntry>>) {
       return p ? { ...a, ...p } : a;
     }),
   );
+}
+
+// ── Farming plan ─────────────────────────────────────────────────────────
+
+export function addFarmTarget(id: string) {
+  const s = getState();
+  if (s.farming.some((f) => f.id === id)) return;
+  const c = s.characters[id];
+  // Sensible default goal: level 90 and 9/9/9, never below what you already have.
+  const talents = (c?.talents ?? [1, 1, 1]).map((t) => Math.max(t, 9)) as [number, number, number];
+  update('farming', (list) => [...list, { id, level: Math.max(c?.level ?? 1, 90), talents }]);
+}
+
+export function patchFarmTarget(id: string, patch: Partial<FarmTarget>) {
+  update('farming', (list) => list.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+}
+
+export function removeFarmTarget(id: string) {
+  update('farming', (list) => list.filter((f) => f.id !== id));
+}
+
+// ── Achievements ──────────────────────────────────────────────────────────
+
+/** Sets how many tiers of an achievement are completed (0 = none). */
+export function setAchievementSteps(a: Achievement, count: number) {
+  setState((s) => ({ ...s, achievements: { ...s.achievements, done: setStepsDone(s.achievements.done, a, count) } }));
+}
+
+export function resetAchievements() {
+  setState((s) => ({ ...s, achievements: { done: {} } }));
 }

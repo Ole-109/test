@@ -90,6 +90,8 @@ function Palette() {
       { id: 'n-chars', group: nav, label: `${t('nav.teyvat')} › ${t('nav.characters')}`, icon: <Users size={16} />, run: go('/teyvat/characters') },
       { id: 'n-wishes', group: nav, label: `${t('nav.teyvat')} › ${t('nav.wishes')}`, icon: <Sparkles size={16} />, keywords: 'pity gacha banner', run: go('/teyvat/wishes') },
       { id: 'n-inv', group: nav, label: `${t('nav.teyvat')} › ${t('nav.inventory')}`, icon: <Sparkles size={16} />, keywords: 'weapons artifacts waffen artefakte good', run: go('/teyvat/inventory') },
+      { id: 'n-ach', group: nav, label: `${t('nav.teyvat')} › ${t('nav.achievements')}`, icon: <Sparkles size={16} />, keywords: 'achievements erfolge paimon uiaf primogems', run: go('/teyvat/achievements') },
+      { id: 'n-farm', group: nav, label: `${t('nav.teyvat')} › ${t('nav.farming')}`, icon: <Sparkles size={16} />, keywords: 'farming materials talent books domain resin farmen', run: go('/teyvat/farming') },
       { id: 'n-plan', group: nav, label: `${t('nav.teyvat')} › ${t('nav.planner')}`, icon: <Sparkles size={16} />, keywords: 'primogems savings', run: go('/teyvat/planner') },
       { id: 'n-import', group: nav, label: `${t('nav.teyvat')} › ${t('nav.import')}`, icon: <Sparkles size={16} />, keywords: 'import uigf paimon good wish history link', run: go('/teyvat/import') },
       { id: 'n-lib', group: nav, label: `${t('nav.anime')} › ${t('nav.library')}`, icon: <Library size={16} />, run: go('/anime') },

@@ -103,3 +103,8 @@ export function formatDuration(ms: number, opts: { seconds?: boolean } = {}): st
   if (opts.seconds) return m > 0 ? `${m}m ${String(sec).padStart(2, '0')}s` : `${sec}s`;
   return `${Math.max(m, 1)}m`;
 }
+
+/** Day of the week on the server (0 = Sunday); the game day starts at the 04:00 reset. */
+export function serverWeekday(now: number, server: Server): number {
+  return new Date(lastDailyReset(now, server) + SERVER_OFFSET[server] * HOUR).getUTCDay();
+}

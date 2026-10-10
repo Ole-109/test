@@ -4,13 +4,14 @@ import { Empty, PageHeader, Segmented } from '../../components/ui';
 import { ItemIcon } from '../../components/visuals';
 import { findArtifactSet, findCharacter, findWeapon, WEAPONS } from '../../data/characters';
 import { critValue, fromGoodKey, isPercentStat, STAT_LABEL } from '../../core/good';
+import { weaponCopies, type WeaponCopies } from '../../core/wishStats';
 import { useT } from '../../i18n';
 import { href } from '../../lib/router';
 import { useStore } from '../../lib/store';
 import type { ArtifactSlot, InvArtifact, Weapon } from '../../lib/types';
 import { TeyvatTabs } from './TeyvatTabs';
 
-type Tab = 'weapons' | 'artifacts' | 'materials';
+type Tab = 'weapons' | 'pulled' | 'artifacts' | 'materials';
 const SLOTS: ArtifactSlot[] = ['flower', 'plume', 'sands', 'goblet', 'circlet'];
 
 const fmtStat = (key: string, v: number) => (isPercentStat(key) ? `${v.toFixed(1)}%` : String(Math.round(v)));
@@ -227,13 +228,61 @@ function Materials() {
   );
 }
 
+/** Weapons from the wish history: copies pulled → highest possible refinement. */
+function PulledWeapons({ list }: { list: WeaponCopies[] }) {
+  const t = useT();
+  const df = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' });
+  return (
+    <>
+      <p className="muted small">{t('inv.pulledHint')}</p>
+      <div className="card table-card">
+        <div className="table-wrap">
+          <table className="log-table">
+            <thead>
+              <tr>
+                <th>{t('inv.weapons')}</th>
+                <th className="num">{t('inv.copies')}</th>
+                <th className="num">{t('inv.maxRefine')}</th>
+                <th>{t('inv.lastPulled')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((w) => {
+                const def = findWeapon(w.name);
+                return (
+                  <tr key={w.name}>
+                    <td>
+                      <span className="log-item">
+                        <ItemIcon icon={def?.icon} name={w.name} rarity={w.rank} size={30} />
+                        <span className={`text-r${w.rank}`}>{(t.lang === 'de' && def?.nameDe) || w.name}</span>
+                      </span>
+                    </td>
+                    <td className="num">{w.copies}</td>
+                    <td className="num">
+                      R{Math.min(5, w.copies)}
+                      {w.copies > 5 && <span className="muted"> +{w.copies - 5}</span>}
+                    </td>
+                    <td className="muted num">{df.format(new Date(w.last.replace(' ', 'T')))}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function Inventory() {
   const t = useT();
   const inv = useStore((s) => s.inventory);
-  const has = { weapons: inv.weapons.length, artifacts: inv.artifacts.length, materials: Object.keys(inv.materials).length };
-  const [tab, setTab] = useState<Tab>(has.weapons || !has.artifacts ? 'weapons' : 'artifacts');
+  const wishes = useStore((s) => s.wishes);
+  const pulled = useMemo(() => weaponCopies(wishes), [wishes]);
+  const has = { weapons: inv.weapons.length, pulled: pulled.length, artifacts: inv.artifacts.length, materials: Object.keys(inv.materials).length };
+  const [tab, setTab] = useState<Tab>(has.weapons ? 'weapons' : has.pulled ? 'pulled' : has.artifacts ? 'artifacts' : 'weapons');
   const df = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' });
-  const empty = !has.weapons && !has.artifacts && !has.materials;
+  const empty = !has.weapons && !has.pulled && !has.artifacts && !has.materials;
 
   return (
     <div className="page">
@@ -261,12 +310,14 @@ export function Inventory() {
             value={tab}
             onChange={setTab}
             options={[
-              { value: 'weapons', label: t('inv.weapons'), count: has.weapons },
+              ...(has.weapons ? [{ value: 'weapons' as Tab, label: t('inv.weapons'), count: has.weapons }] : []),
+              ...(has.pulled ? [{ value: 'pulled' as Tab, label: t('inv.pulled'), count: has.pulled }] : []),
               { value: 'artifacts', label: t('inv.artifacts'), count: has.artifacts },
               { value: 'materials', label: t('inv.materials'), count: has.materials },
             ]}
           />
           {tab === 'weapons' && <Weapons />}
+          {tab === 'pulled' && <PulledWeapons list={pulled} />}
           {tab === 'artifacts' && <Artifacts />}
           {tab === 'materials' && <Materials />}
         </>

@@ -1439,3 +1439,8 @@ textarea::placeholder {
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
+
+.el-icon img {
+  display: block;
+  object-fit: contain;
+}

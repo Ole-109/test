@@ -10,9 +10,15 @@ data out of the game and HoYoverse services. English and German UI.
   4★ breakdown, lifetime stats, current pity per banner and a searchable, paged pull log.
 - **Import** from the in-game wish link, UIGF v3/v4 files, paimon.moe backups, GOOD files
   (Inventory Kamera, Genshin Optimizer, …) and full Waypoint exports. **Export** to UIGF v4.
+  Files with several kinds of data (e.g. a paimon.moe backup with wishes, achievements, characters and
+  AR/WL for every account) open a menu to pick the account and the parts to import.
 - **Characters**: every playable character (generated from game data, with icons). Track level,
   constellations, talents, weapon and build. Imports fill this in.
-- **Inventory**: weapons, artifacts (with crit value) and materials from GOOD imports.
+- **Inventory**: weapons, artifacts (with crit value) and materials from GOOD imports, plus weapon
+  refinements derived from the wish history.
+- **Farming plan**: exact ascension/talent materials for target levels, domains open today, resin estimate.
+- **Achievements**: all achievements in English and German with tiers, Primogem totals, search and version
+  filter. Import from a paimon.moe backup or UIAF (Snap Hutao, YaeAchievement, Cocogoat, …), export UIAF.
 - **Today**: live Original Resin, daily/weekly/monthly routine with correct 04:00 server resets, cooldowns.
 - **Planner**: chance to get a featured 5★ (C0–C6 / R1–R5) from your savings, current pity and guarantee.
 
@@ -77,7 +83,7 @@ npm test             # unit tests: resets, resin, gacha model, wish parsing, imp
 npm run typecheck    # app + build config + CLI
 npm run build        # static site in dist/
 npm run build:cli    # tools/dist/waypoint-export.mjs
-npm run sync-data    # refresh characters/weapons/artifact sets from gi.yatta.moe
+npm run sync-data    # refresh characters/weapons/materials/achievements from gi.yatta.moe
 ```
 
 Game data and icons come from [Project Amber](https://gi.yatta.moe) (icons are linked, not bundled).
@@ -85,10 +91,10 @@ Anime data comes from [AniList](https://anilist.co). `.github/workflows/deploy.y
 pushes to `main` (enable *Settings → Pages → Source: GitHub Actions*).
 
 ```
-src/core/       wish API client, wish statistics, UIGF/paimon/GOOD formats (shared with the CLI)
+src/core/       wish API client, wish statistics, UIGF/paimon/GOOD/UIAF formats, farming, achievements
 src/lib/        store, actions, import application, resets, resin, gacha model, AniList client
-src/data/       generated game data (game.json) and lookups
-src/views/      Overview, Teyvat (Today, Characters, Inventory, Wishes, Planner, Import), Anime, Settings
+src/data/       generated game data (game.json, achievements.json – loaded on demand) and lookups
+src/views/      Overview, Teyvat (Today, Characters, Inventory, Farming, Achievements, Wishes, Planner, Import), Anime, Settings
 tools/cli/      waypoint-export source (cache search, HoYoLAB, Enka)
 tools/export.ps1, tools/proxy/worker.js
 ```

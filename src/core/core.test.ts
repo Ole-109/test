@@ -4,7 +4,7 @@ import type { WishRecord } from '../lib/types';
 import { fetchWishHistory, findWishUrls, GachaApiError, pageUrl, parseWishUrl } from './gachaApi';
 import { critValue, fromGoodKey, setSummary, toGoodKey } from './good';
 import { mergeWishes, parseImport, toUigfV4 } from './formats';
-import { analyzePool } from './wishStats';
+import { analyzePool, weaponCopies } from './wishStats';
 
 const rec = (id: string, name: string, rank: 3 | 4 | 5, gachaType: WishRecord['gachaType'] = '301', time = '2024-01-01 10:00:00'): WishRecord => ({
   id,
@@ -218,5 +218,21 @@ describe('GOOD helpers', () => {
     expect(setSummary([{ setKey: 'A' }, { setKey: 'A' }, { setKey: 'A' }, { setKey: 'A' }, { setKey: 'B' }])).toBe('4pc A');
     expect(setSummary([{ setKey: 'A' }, { setKey: 'A' }, { setKey: 'B' }, { setKey: 'B' }])).toBe('2pc A + 2pc B');
     expect(critValue({ substats: [{ key: 'critRate_', value: 10.5 }, { key: 'critDMG_', value: 21 }] })).toBe(42);
+  });
+});
+
+describe('weapon copies', () => {
+  it('counts 4★/5★ weapon copies for refinements', () => {
+    const list = weaponCopies([
+      rec('1', 'The Flute', 4, '302'),
+      rec('2', 'The Flute', 4, '200'),
+      rec('3', 'Skyward Harp', 5, '302'),
+      rec('4', 'Cool Steel', 3, '302'),
+      rec('5', 'Furina', 5),
+    ]);
+    expect(list.map((w) => [w.name, w.copies])).toEqual([
+      ['Skyward Harp', 1],
+      ['The Flute', 2],
+    ]);
   });
 });

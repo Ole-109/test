@@ -1,4 +1,6 @@
-import { Heart, Trash2, UserMinus, UserPlus } from 'lucide-react';
+import { Heart, Pickaxe, Trash2, UserMinus, UserPlus } from 'lucide-react';
+import { hasCostData } from '../../core/farming';
+import { href } from '../../lib/router';
 import { Sheet } from '../../components/Sheet';
 import { toast } from '../../components/toast';
 import { Button, Field, IconButton, Rarity, Segmented, Stepper, TextInput } from '../../components/ui';
@@ -6,7 +8,7 @@ import { CharacterIcon, ElementIcon, ItemIcon } from '../../components/visuals';
 import { findArtifactSet, findCharacter, findWeapon } from '../../data/characters';
 import { critValue, fromGoodKey, STAT_LABEL } from '../../core/good';
 import { useT } from '../../i18n';
-import { patchCharacter, restore, setOwned, snapshot } from '../../lib/actions';
+import { addFarmTarget, patchCharacter, restore, setOwned, snapshot } from '../../lib/actions';
 import { update, useStore } from '../../lib/store';
 import type { BuildStatus, CharacterDef } from '../../lib/types';
 
@@ -194,6 +196,8 @@ export function CharacterSheet({ c, onClose }: { c: CharacterDef; onClose: () =>
             </Field>
           </div>
 
+          <FarmButton id={c.id} />
+
           <Equipment c={c} />
 
           <Field label={t('common.notes')} htmlFor="ch-notes">
@@ -259,5 +263,21 @@ function Equipment({ c }: { c: CharacterDef }) {
         )}
       </div>
     </Field>
+  );
+}
+
+function FarmButton({ id }: { id: string }) {
+  const t = useT();
+  const inPlan = useStore((s) => s.farming.some((f) => f.id === id));
+  if (!hasCostData(id)) return null;
+  return inPlan ? (
+    <a className="btn btn-secondary btn-sm" href={href('/teyvat/farming')} style={{ alignSelf: 'flex-start' }}>
+      <Pickaxe size={14} />
+      <span>{t('farm.inPlan')}</span>
+    </a>
+  ) : (
+    <Button size="sm" icon={<Pickaxe size={14} />} onClick={() => addFarmTarget(id)} style={{ alignSelf: 'flex-start' }}>
+      {t('farm.addToPlan')}
+    </Button>
   );
 }

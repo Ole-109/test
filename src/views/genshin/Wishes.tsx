@@ -1,6 +1,9 @@
-import { ChevronLeft, ChevronRight, Search, Upload } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Copy, ImageDown, Search, Share2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Columns } from '../../components/charts';
+import { Sheet } from '../../components/Sheet';
+import { toast } from '../../components/toast';
+import { renderShareCard } from '../../lib/shareCard';
 import { Button, Empty, IconButton, PageHeader, Segmented } from '../../components/ui';
 import { ItemIcon } from '../../components/visuals';
 import { findCharacter, findWeapon, localName } from '../../data/characters';
@@ -358,6 +361,106 @@ function PullLog({ records, pool }: { records: WishRecord[]; pool: BannerKey }) 
   );
 }
 
+function ShareButton({ stats }: { stats: Record<BannerKey, PoolStats> }) {
+  const t = useT();
+  const account = useStore((s) => s.account);
+  const uid = useStore((s) => s.wishMeta.uid);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
+  useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
+
+  const build = async () => {
+    setOpen(true);
+    setBusy(true);
+    try {
+      const all = BANNERS.map((b) => stats[b]);
+      const total = all.reduce((s, x) => s + x.total, 0);
+      const five = all.reduce((s, x) => s + x.five.length, 0);
+      const c = stats.character;
+      const fifty = c.fiftyWon + c.fiftyLost;
+      const recent = [...stats.character.five, ...stats.weapon.five, ...stats.chronicled.five, ...stats.standard.five]
+        .sort((a, b) => (a.record.time < b.record.time ? 1 : -1))
+        .map((f) => ({ name: f.record.name, icon: itemVisual(f.record).icon, pity: f.pity, soft: f.pity >= RULES[POOL_OF[f.record.gachaType] === 'weapon' ? 'weapon' : 'character'].softStart }));
+      const df = new Intl.DateTimeFormat(t.lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' });
+      const png = await renderShareCard({
+        title: account.nickname ? t('share.titleNamed', { name: account.nickname }) : t('share.title'),
+        subtitle: [uid && `UID ${uid}`, account.level && t('home.ar', { n: account.level }), df.format(new Date())].filter(Boolean).join(' · '),
+        stats: [
+          { label: t('wish.lifetime'), value: t.num(total), sub: t('wish.primosSpent', { n: t.num(total * 160) }) },
+          { label: t('share.fiveStars'), value: t.num(five), sub: c.five.length ? t('wish.avg', { n: t.num(Math.round(c.avgPity5 * 10) / 10) }) : undefined },
+          { label: t('wish.winRate'), value: fifty ? `${c.fiftyWon} / ${fifty}` : '—', sub: fifty ? pct(c.fiftyWon / fifty, t.lang) : undefined },
+          {
+            label: t('wish.luckPity'),
+            value: c.five.length ? pct(pityLuck(c.avgPity5, c.five.length, RULES.character), t.lang) : '—',
+            sub: t('share.luckSub'),
+          },
+        ],
+        banners: BANNERS.map((b) => ({
+          name: t(`wish.banner.${b}`),
+          total: t.num(stats[b].total),
+          five: `${stats[b].five.length}× 5★`,
+          pity: stats[b].five.length ? `Ø ${t.num(Math.round(stats[b].avgPity5 * 10) / 10)}` : '—',
+        })),
+        recentLabel: t('share.recent'),
+        recent,
+        footer: t('share.footer'),
+      });
+      setBlob(png);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const download = () => {
+    if (!url) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `waypoint-wishes-${uid ?? 'summary'}.png`;
+    a.click();
+  };
+
+  const copy = async () => {
+    if (!blob) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      toast({ message: t('share.copied'), tone: 'success' });
+    } catch {
+      toast({ message: t('share.copyFailed'), tone: 'error' });
+    }
+  };
+
+  return (
+    <>
+      <Button icon={<Share2 size={16} />} onClick={build}>
+        {t('share.button')}
+      </Button>
+      {open && (
+        <Sheet
+          open
+          wide
+          onClose={() => setOpen(false)}
+          title={t('share.button')}
+          closeLabel={t('common.close')}
+          footer={
+            <>
+              <Button icon={<Copy size={16} />} onClick={copy} disabled={!blob}>
+                {t('share.copy')}
+              </Button>
+              <Button variant="primary" icon={<ImageDown size={16} />} onClick={download} disabled={!blob}>
+                {t('share.download')}
+              </Button>
+            </>
+          }
+        >
+          {busy || !url ? <div className="share-preview skeleton" /> : <img className="share-preview" src={url} alt={t('share.button')} />}
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 export function Wishes() {
   const t = useT();
   const wishes = useStore((s) => s.wishes);
@@ -376,9 +479,12 @@ export function Wishes() {
         title={t('wish.title')}
         subtitle={t('wish.subtitle')}
         actions={
-          <Button icon={<Upload size={16} />} variant={wishes.length ? 'secondary' : 'primary'} onClick={() => navigate('/teyvat/import')}>
-            {t('wish.importCta')}
-          </Button>
+          <>
+            {wishes.length > 0 && <ShareButton stats={stats} />}
+            <Button icon={<Upload size={16} />} variant={wishes.length ? 'secondary' : 'primary'} onClick={() => navigate('/teyvat/import')}>
+              {t('wish.importCta')}
+            </Button>
+          </>
         }
       />
 

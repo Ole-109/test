@@ -8,6 +8,8 @@ export type Route =
   | '/teyvat/planner'
   | '/teyvat/import'
   | '/teyvat/inventory'
+  | '/teyvat/farming'
+  | '/teyvat/achievements'
   | '/anime'
   | '/anime/schedule'
   | '/anime/stats'
@@ -22,6 +24,8 @@ const ROUTES: Route[] = [
   '/teyvat/planner',
   '/teyvat/import',
   '/teyvat/inventory',
+  '/teyvat/farming',
+  '/teyvat/achievements',
   '/anime',
   '/anime/schedule',
   '/anime/stats',
