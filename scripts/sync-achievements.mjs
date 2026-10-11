@@ -85,6 +85,14 @@ const questName = (q) => (q ? clean(q.questTitle) || clean(q.chapterTitle) : '')
 /** The quest's own page, else its quest series page. */
 const wikiFor = (q) => (q ? (wikiIds.get(q.questTitle) ?? wikiIds.get(q.chapterTitle)) : undefined);
 
+/**
+ * Achievements that exist in the game files but cannot be earned (never shown
+ * in game, not listed by paimon.moe or other trackers).
+ */
+const UNOBTAINABLE = new Set([
+  84517, // "Instant Karma": in the 1.0 data, never obtainable
+]);
+
 let groups = 0;
 let steps = 0;
 let linked = 0;
@@ -92,6 +100,7 @@ const categories = Object.values(en)
   .map((c) => {
     const cDe = de[c.id] ?? {};
     const items = Object.values(c.achievementList)
+      .filter((a) => !UNOBTAINABLE.has(a.id))
       .map((a) => {
         const aDe = cDe.achievementList?.[a.id] ?? {};
         const quest = firstQuest(a);

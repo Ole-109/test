@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import data from '../data/achievements.json';
 import { applyImport } from '../lib/importActions';
 import { getState, setState, defaultState } from '../lib/store';
-import { hoyowikiUrl, mergeDone, parseUiaf, progressOf, setStepsDone, stepsDone, toUiaf, type Achievement, type AchievementData } from './achievements';
+import { hoyowikiUrl, listedOnly, parsePaimonAchievements, parseUiaf, replaceDone, progressOf, setStepsDone, stepsDone, toUiaf, type Achievement, type AchievementData } from './achievements';
 import { parseImport, partsOf } from './formats';
 
 const DATA = data as AchievementData;
@@ -63,15 +63,37 @@ describe('tiered progress', () => {
     expect(Object.keys(done)).toEqual([String(tiered.steps[0].id)]);
   });
 
-  it('merges without unticking and counts only new completions', () => {
-    const { done, added } = mergeDone({ '1': 10, '2': 0 }, { '2': 7, '3': 0 });
-    expect(done).toEqual({ '1': 10, '2': 7, '3': 0 });
+  it('an import replaces the progress and keeps known dates', () => {
+    const { done, added, removed } = replaceDone({ '1': 10, '2': 4 }, { '2': 0, '3': 0 });
+    expect(done).toEqual({ '2': 4, '3': 0 });
     expect(added).toBe(1);
+    expect(removed).toBe(1);
   });
 
   it('sums progress and primogems', () => {
     const a: Achievement = { id: 1, order: 1, ver: '1.0', title: 'x', titleDe: 'x', steps: [{ id: 1, desc: '', descDe: '', reward: 5 }, { id: 2, desc: '', descDe: '', reward: 10 }] };
     expect(progressOf([a], { '2': 0 })).toEqual({ steps: 2, done: 1, primos: 15, primosDone: 10 });
+  });
+});
+
+describe('paimon.moe totals', () => {
+  const step = (id: number) => ({ id, desc: '', descDe: '', reward: 5 });
+  const data = {
+    updated: '',
+    categories: [
+      { id: 0, order: 1, name: '', nameDe: '', icon: '', items: [{ id: 81222, order: 1, ver: '1.0', title: '', titleDe: '', steps: [step(81222), step(80001)] }] },
+      { id: 17, order: 2, name: '', nameDe: '', icon: '', items: [{ id: 84026, order: 1, ver: '1.0', title: '', titleDe: '', steps: [step(84026)] }] },
+    ],
+  } as AchievementData;
+
+  it('counts only ticks in the achievement\'s own category, like paimon.moe', () => {
+    const { done, categories } = parsePaimonAchievements({ '0': { 81219: true, 84026: true, 99999: true }, '17': { 80001: true }, '3': { 81222: false } });
+    // paimon.moe's own migrations: 81219 → 81222, 84026 moved to category 17.
+    expect(Object.keys(listedOnly(done, data, categories)).sort()).toEqual(['81222', '84026']);
+  });
+
+  it('drops ids that are not in the data', () => {
+    expect(listedOnly({ '80001': 3, '84517': 0 }, data)).toEqual({ '80001': 3 });
   });
 });
 
@@ -107,11 +129,11 @@ describe('paimon.moe backup', () => {
     expect(s.wishes).toHaveLength(0);
     expect(s.account.level).toBeUndefined();
     expect(Object.keys(s.achievements.done)).toHaveLength(3);
-    expect(summary.achievements).toEqual({ added: 3, total: 3 });
+    expect(summary.achievements).toEqual({ added: 3, removed: 0, total: 3 });
     expect(s.characters['kamisato-ayaka'].constellation).toBe(2);
     expect(summary.roster).toBe(2);
     // Importing again adds nothing new.
-    expect(applyImport(r, ['achievements']).achievements).toEqual({ added: 0, total: 3 });
+    expect(applyImport(r, ['achievements']).achievements).toEqual({ added: 0, removed: 0, total: 3 });
   });
 });
 

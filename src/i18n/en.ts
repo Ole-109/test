@@ -646,6 +646,8 @@ export const en = {
   "import.pickCancel": "Cancel",
   "import.pickNone": "Select at least one part.",
   "import.achievementsAdded": "Achievements: {n} newly completed ({total} in total)",
+  "import.achievementsRemoved": "{n} unticked (not completed in the file)",
+  "import.part.achievementsGone": "{n} ticked here but not in the file will be unticked",
   "import.rosterUpdated": "{n} characters added or constellations raised",
   "import.profileUpdated": "Profile updated (AR, World Level, server)",
   "import.dropHintAch": "Achievements: paimon.moe backup or a UIAF file (Snap Hutao, YaeAchievement, Cocogoat, …)",

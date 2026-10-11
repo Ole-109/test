@@ -7,7 +7,7 @@ import type { MessageKey } from '../../i18n/en';
 import { GachaApiError, type FetchProgress } from '../../core/gachaApi';
 import { ImportError, parseImport, partsOf, toUigfV4, type ImportPart, type ImportResult } from '../../core/formats';
 import { restore, snapshot } from '../../lib/actions';
-import { applyImport, clearWishes, type ImportSummary } from '../../lib/importActions';
+import { applyImport, clearWishes, withListedAchievements, type ImportSummary } from '../../lib/importActions';
 import { getState, useStore } from '../../lib/store';
 import { importFromLink } from '../../lib/wishFetch';
 import { TeyvatTabs } from './TeyvatTabs';
@@ -73,7 +73,12 @@ function Summary({ s, label }: { s: ImportSummary; label: string }) {
             <li>{t('import.charsFromWishes', { added: s.fromWishes.added, raised: s.fromWishes.raised })}</li>
           )}
           {(s.weapons > 0 || s.artifacts > 0) && <li>{t('import.gear', { w: s.weapons, a: s.artifacts })}</li>}
-          {s.achievements && <li>{t('import.achievementsAdded', { n: t.num(s.achievements.added), total: t.num(s.achievements.total) })}</li>}
+          {s.achievements && (
+            <li>
+              {t('import.achievementsAdded', { n: t.num(s.achievements.added), total: t.num(s.achievements.total) })}
+              {s.achievements.removed > 0 && ` · ${t('import.achievementsRemoved', { n: t.num(s.achievements.removed) })}`}
+            </li>
+          )}
           {s.roster > 0 && <li>{t('import.rosterUpdated', { n: s.roster })}</li>}
           {s.profile && <li>{t('import.profileUpdated')}</li>}
           {s.realtime && <li>{t('import.realtime')}</li>}
@@ -119,7 +124,7 @@ function FileDrop({ onResult }: { onResult: (s: ImportSummary, label: string) =>
     setError(null);
     setPending(null);
     try {
-      const result = parseImport(await file.text());
+      const result = await withListedAchievements(parseImport(await file.text()));
       // Let the user choose when a file holds more than one kind of data (always for paimon.moe backups).
       if (result.kind === 'paimon' || result.accounts || partsOf(result).length > 1) setPending({ result, file: file.name });
       else apply(result, file.name);
@@ -212,7 +217,10 @@ function ImportPicker({
       }
       case 'achievements': {
         const ids = Object.keys(current.achievements!);
-        return t('import.part.achievementsInfo', { n: t.num(ids.length), new: t.num(ids.filter((id) => !(id in doneNow)).length) });
+        const info = t('import.part.achievementsInfo', { n: t.num(ids.length), new: t.num(ids.filter((id) => !(id in doneNow)).length) });
+        // The file replaces the current progress: say what it unticks.
+        const gone = Object.keys(doneNow).filter((id) => !(id in current.achievements!)).length;
+        return gone ? `${info} · ${t('import.part.achievementsGone', { n: t.num(gone) })}` : info;
       }
       case 'roster':
         return t('import.part.rosterInfo', { n: current.roster!.length });

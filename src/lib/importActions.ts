@@ -1,6 +1,6 @@
 import { findCharacter, findWeapon, STANDARD_FIVE_STAR_WEAPONS } from '../data/characters';
 import { fromGoodKey, setSummary, type GoodCharacter, type GoodData } from '../core/good';
-import { mergeDone } from '../core/achievements';
+import { listedOnly, loadAchievements, replaceDone } from '../core/achievements';
 import { mergeWishes, partsOf, type ImportPart, type ImportResult, type Realtime } from '../core/formats';
 import { analyzePool, BANNER_POOLS, characterCopies, POOL_OF } from '../core/wishStats';
 import { newOwned } from './actions';
@@ -21,8 +21,8 @@ export interface ImportSummary {
   artifacts: number;
   unknown: string[];
   realtime: boolean;
-  /** Newly completed achievements / total completed after the import (when achievements were imported). */
-  achievements?: { added: number; total: number };
+  /** Newly completed / no longer completed achievements and the total after the import (when achievements were imported). */
+  achievements?: { added: number; removed: number; total: number };
   /** Characters set from paimon.moe's character list. */
   roster: number;
   profile: boolean;
@@ -240,6 +240,20 @@ function applyRoster(s: AppState, roster: NonNullable<ImportResult['roster']>, s
 }
 
 /** Applies an import result to the store, limited to `parts` (default: everything). Returns a summary for the UI. */
+/**
+ * Drops achievement ticks the tracker would not count (unknown ids, or for
+ * paimon.moe ticks outside the achievement's category), so the import shows
+ * the same totals as its source. Loads the achievement data when needed.
+ */
+export async function withListedAchievements(result: ImportResult): Promise<ImportResult> {
+  const has = (r: ImportResult) => !!r.achievements && Object.keys(r.achievements).length > 0;
+  if (!has(result) && !result.accounts?.some((a) => has(a.result))) return result;
+  const data = await loadAchievements();
+  const fix = (r: ImportResult): ImportResult =>
+    r.achievements ? { ...r, achievements: listedOnly(r.achievements, data, r.achievementCategories) } : r;
+  return { ...fix(result), accounts: result.accounts?.map((a) => ({ ...a, result: fix(a.result) })) };
+}
+
 export function applyImport(result: ImportResult, parts: ImportPart[] = partsOf(result)): ImportSummary {
   const want = new Set(parts);
   const summary: ImportSummary = {
@@ -282,9 +296,9 @@ export function applyImport(result: ImportResult, parts: ImportPart[] = partsOf(
     summary.fromWishes = { added: synced.added, raised: synced.raised };
   }
   if (want.has('achievements') && result.achievements) {
-    const { done, added } = mergeDone(s.achievements.done, result.achievements);
+    const { done, added, removed } = replaceDone(s.achievements.done, result.achievements);
     s = { ...s, achievements: { done, importedAt: Date.now(), source: result.label } };
-    summary.achievements = { added, total: Object.keys(done).length };
+    summary.achievements = { added, removed, total: Object.keys(done).length };
   }
   if (want.has('profile')) {
     if (result.account) s = { ...s, account: { ...s.account, ...result.account } };

@@ -94,22 +94,6 @@ export function setStepsDone(done: Done, a: Achievement, count: number, now = Da
   return next;
 }
 
-/** Adds incoming completions; never removes anything already ticked. */
-export function mergeDone(existing: Done, incoming: Done): { done: Done; added: number } {
-  const done = { ...existing };
-  let added = 0;
-  for (const [id, at] of Object.entries(incoming)) {
-    if (id in done) {
-      // Prefer a real completion date over an unknown one.
-      if (!done[id] && at) done[id] = at;
-      continue;
-    }
-    done[id] = at;
-    added++;
-  }
-  return { done, added };
-}
-
 // ── UIAF (Unified Standardized Genshin Achievement Format) ────────────────
 
 export interface UiafFile {
@@ -144,13 +128,64 @@ export function toUiaf(data: AchievementData, done: Done): UiafFile {
 
 // ── paimon.moe ───────────────────────────────────────────────────────────
 
-/** paimon.moe stores `{ [categoryId]: { [achievementId]: true } }`. */
-export function parsePaimonAchievements(raw: unknown): Done {
+/** Ids paimon.moe moved from "Wonders of the World" to "Meet the Locals" (it migrates old ticks on load). */
+const PAIMON_MOVED = [84026, 84100, 84101, 84104, 84028, 84107, 84102, 84108, 84105, 84103, 84106, 84109, 84110, 84111, 84112, 84113, 84114, 84115];
+
+/**
+ * paimon.moe stores `{ [categoryId]: { [achievementId]: true } }`. Returns the
+ * ticked ids and the categories they were ticked in: paimon.moe only counts a
+ * tick inside the achievement's own category, so Waypoint does the same.
+ */
+export function parsePaimonAchievements(raw: unknown): { done: Done; categories: Record<string, number[]> } {
   const done: Done = {};
-  if (!raw || typeof raw !== 'object') return done;
-  for (const cat of Object.values(raw as Record<string, unknown>)) {
-    if (!cat || typeof cat !== 'object') continue;
-    for (const [id, v] of Object.entries(cat as Record<string, unknown>)) if (v === true && /^\d+$/.test(id)) done[id] = 0;
+  const categories: Record<string, number[]> = {};
+  if (!raw || typeof raw !== 'object') return { done, categories };
+  for (const [catKey, cat] of Object.entries(raw as Record<string, unknown>)) {
+    if (!cat || typeof cat !== 'object' || !/^\d+$/.test(catKey)) continue;
+    for (const [key, v] of Object.entries(cat as Record<string, unknown>)) {
+      if (v !== true || !/^\d+$/.test(key)) continue;
+      // The same migrations paimon.moe applies to old backups.
+      let catId = Number(catKey);
+      let id = key;
+      if (catId === 0 && PAIMON_MOVED.includes(Number(id))) catId = 17;
+      if (catId === 0 && id === '81219') id = '81222';
+      done[id] = 0;
+      (categories[id] ??= []).push(catId);
+    }
   }
-  return done;
+  return { done, categories };
+}
+
+/**
+ * Keeps only ticks of achievements that exist in the data (and, for paimon.moe,
+ * were ticked in their own category), so totals match the source.
+ */
+export function listedOnly(done: Done, data: AchievementData, categories?: Record<string, number[]>): Done {
+  const catOf = new Map<string, number>();
+  for (const c of data.categories) for (const a of c.items) for (const s of a.steps) catOf.set(String(s.id), c.id);
+  const out: Done = {};
+  for (const [id, at] of Object.entries(done)) {
+    const cat = catOf.get(id);
+    if (cat == null || (categories && !categories[id]?.includes(cat))) continue;
+    out[id] = at;
+  }
+  return out;
+}
+
+/**
+ * Takes over a full export (paimon.moe, UIAF) as the new progress, so both
+ * apps show the same totals. Keeps known completion dates.
+ */
+export function replaceDone(existing: Done, incoming: Done): { done: Done; added: number; removed: number } {
+  const done: Done = {};
+  let added = 0;
+  for (const [id, at] of Object.entries(incoming)) {
+    if (id in existing) done[id] = at || existing[id];
+    else {
+      done[id] = at;
+      added++;
+    }
+  }
+  const removed = Object.keys(existing).filter((id) => !(id in incoming)).length;
+  return { done, added, removed };
 }

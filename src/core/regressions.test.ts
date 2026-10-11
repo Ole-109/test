@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { addFarmTarget, removeAnime, removeOwned, restoreAnime, setOwned, setSetting } from '../lib/actions';
-import { applyImport, setWishOverride } from '../lib/importActions';
+import { applyImport, setWishOverride, withListedAchievements } from '../lib/importActions';
 import { resinAt } from '../lib/resin';
 import { defaultState, getState, hydrate, isWaypointBackup, setState } from '../lib/store';
 import { HOUR } from '../lib/time';
@@ -62,6 +62,17 @@ describe('wish imports', () => {
     setWishOverride(id, 'won');
     expect(getState().banners.character.pity5).toBe(30);
     expect(getState().banners.character.history[0].outcome).toBe('won');
+  });
+});
+
+describe('achievement imports', () => {
+  it('match paimon.moe: unknown ids and ticks in the wrong category are dropped, old ticks replaced', async () => {
+    const load = async (cats: Record<string, Record<string, boolean>>) => applyImport(await withListedAchievements(parseImport(JSON.stringify({ achievement: cats }))));
+    // 80001–80003 belong to category 1.
+    setState({ ...getState(), achievements: { done: { '84517': 0, '80001': 0 } } });
+    const summary = await load({ '0': { 80002: true, 84517: true }, '1': { 80001: true, 80003: true } });
+    expect(getState().achievements.done).toEqual({ '80001': 0, '80003': 0 });
+    expect(summary.achievements).toEqual({ added: 1, removed: 1, total: 2 });
   });
 });
 

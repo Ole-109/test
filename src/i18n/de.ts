@@ -648,6 +648,8 @@ export const de: Record<MessageKey, string> = {
   "import.pickCancel": "Abbrechen",
   "import.pickNone": "Wähle mindestens einen Teil aus.",
   "import.achievementsAdded": "Erfolge: {n} neu erledigt ({total} insgesamt)",
+  "import.achievementsRemoved": "{n} Häkchen entfernt (in der Datei nicht erledigt)",
+  "import.part.achievementsGone": "{n} hier abgehakte, die in der Datei fehlen, werden entfernt",
   "import.rosterUpdated": "{n} Figuren hinzugefügt oder Konstellationen erhöht",
   "import.profileUpdated": "Profil aktualisiert (Abenteuerrang, Weltstufe, Server)",
   "import.dropHintAch": "Erfolge: paimon.moe-Backup oder UIAF-Datei (Snap Hutao, YaeAchievement, Cocogoat, …)",

@@ -42,6 +42,8 @@ export interface ImportResult {
   server?: Server;
   realtime?: Realtime;
   achievements?: Done;
+  /** paimon.moe: the categories each achievement was ticked in (see `listedOnly`). */
+  achievementCategories?: Record<string, number[]>;
   /** Owned characters by name with total copies (paimon.moe's character page). */
   roster?: { name: string; copies: number }[];
   /** When the source file was written (paimon.moe: last change). */
@@ -270,11 +272,13 @@ function paimonAccount(json: Record<string, unknown>, prefix: string): ImportRes
   if (num(json[`${prefix}ar`]) != null) account.level = num(json[`${prefix}ar`]);
   if (num(json[`${prefix}wl`]) != null) account.worldLevel = num(json[`${prefix}wl`]);
   if (serverName) account.server = serverName;
+  const ach = parsePaimonAchievements(json[`${prefix}achievement`]);
   return {
     kind: 'paimon',
     label: 'paimon.moe backup',
     wishes: records.length ? { records, uid } : undefined,
-    achievements: parsePaimonAchievements(json[`${prefix}achievement`]),
+    achievements: ach.done,
+    achievementCategories: ach.categories,
     roster: roster?.length ? roster : undefined,
     account,
     server: serverName ? PAIMON_SERVER[serverName] : undefined,
